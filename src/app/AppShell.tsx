@@ -7,12 +7,15 @@ import { Logo } from '@/components/layout/Logo'
 import { Button } from '@/components/ui'
 import { PRIMARY_NAV_ITEMS } from '@/config/navigation'
 import { useApp } from '@/app/AppContext'
+import { useCloud } from '@/app/CloudContext'
 import { useNotificationScheduler } from '@/hooks/useNotifications'
+import { AuthPage, PasswordRecoveryPage } from '@/pages/AuthPage'
 import { cn } from '@/lib/utils'
 import { Mascot } from '@/components/mascots/Mascot'
 
 export function AppShell() {
   const { data, ready, error } = useApp()
+  const cloud = useCloud()
   const location = useLocation()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [updateReload, setUpdateReload] = useState<(() => void) | null>(null)
@@ -35,6 +38,22 @@ export function AppShell() {
 
   if (!ready) {
     return <BootScreen error={error} />
+  }
+
+  /*
+   * Sign-in comes first. When cloud auth is configured, the planner is only
+   * reachable once there is a session, so the very first screen is the
+   * login / sign-up page. A deployment without Supabase credentials keeps
+   * working exactly as before — a purely local planner — because there would be
+   * nothing to sign in to.
+   */
+  if (cloud.configured && cloud.status !== 'signed-in') {
+    return cloud.status === 'loading' ? <BootScreen error={null} /> : <AuthPage />
+  }
+
+  // A password-recovery link signs the user in; ask for the new password first.
+  if (cloud.recovering) {
+    return <PasswordRecoveryPage />
   }
 
   return (

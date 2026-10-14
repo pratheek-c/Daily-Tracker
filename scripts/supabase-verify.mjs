@@ -7,6 +7,7 @@
  * Usage:
  *   node scripts/supabase-verify.mjs schema
  *   node scripts/supabase-verify.mjs auth
+ *   node scripts/supabase-verify.mjs password
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -44,7 +45,7 @@ const secret = env.SUPABASE_SECRET_KEY
 
 const which = process.argv[2]
 if (!which) {
-  console.error('Usage: node scripts/supabase-verify.mjs <schema|auth>')
+  console.error('Usage: node scripts/supabase-verify.mjs <schema|auth|password>')
   process.exit(2)
 }
 
@@ -56,11 +57,12 @@ if (!url) {
 const scripts = {
   schema: { file: 'verify-supabase.mjs', args: [url, publishable, secret] },
   auth: { file: 'check-supabase-auth.mjs', args: [url, secret] },
+  password: { file: 'check-auth-password.mjs', args: [url, publishable, secret] },
 }
 
 const target = scripts[which]
 if (!target) {
-  console.error(`Unknown check "${which}". Use "schema" or "auth".`)
+  console.error(`Unknown check "${which}". Use "schema", "auth" or "password".`)
   process.exit(2)
 }
 

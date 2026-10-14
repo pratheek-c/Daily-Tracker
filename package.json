@@ -20,9 +20,11 @@
     "supabase:db:push": "node scripts/supabase-cli.mjs db push",
     "supabase:db:reset": "node scripts/supabase-cli.mjs db reset",
     "supabase:auth:set": "node scripts/set-auth-redirects.mjs",
+    "supabase:auth:email": "node scripts/set-auth-email.mjs",
     "supabase:config:push": "node scripts/supabase-cli.mjs config push",
     "supabase:check": "node scripts/supabase-verify.mjs schema",
-    "supabase:auth:check": "node scripts/supabase-verify.mjs auth"
+    "supabase:auth:check": "node scripts/supabase-verify.mjs auth",
+    "supabase:auth:password": "node scripts/supabase-verify.mjs password"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

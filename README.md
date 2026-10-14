@@ -159,6 +159,10 @@ Cloud sync is **optional and additive**. With no credentials configured the app 
 purely local planner; the Settings → Cloud sync tab then shows the setup steps instead of a broken
 form.
 
+Once credentials *are* present, **sign-in comes first**: the app opens on a login / sign-up page and
+the planner is only reachable with a session. Email + password is the credential (see step 5 below),
+chosen because it sends no email and therefore dodges the hosted mailer's tiny hourly limit.
+
 ### Setup
 
 1. **Create a project** at [supabase.com](https://supabase.com).
@@ -197,11 +201,10 @@ form.
    deliberately does not use `supabase config push`, and the reason is worth knowing:
 
    > **Do not run `supabase config push` on this project.** `supabase init` writes a config full of
-   > *defaults*, and `config push` pushes every property it declares. On this project that would have
-   > flipped `auth.email.enable_confirmations` from `true` to `false` — silently removing email
-   > verification — shortened the email OTP from 8 to 6 digits, and rewritten pooler, MFA and storage
-   > settings. `supabase/config.toml` in this repository has since been aligned to the hosted values
-   > so a future push is no longer dangerous, but the surgical script remains the safer default.
+   > *defaults*, and `config push` pushes every property it declares, which would rewrite pooler, MFA
+   > and storage settings the dashboard owns. `supabase/config.toml` in this repository is kept
+   > aligned to the hosted values so a push is no longer dangerous, but the surgical scripts remain
+   > the safer default.
 
    `scripts/set-auth-redirects.mjs` reads the config back before and after the change and asserts that
    email confirmations and the OTP length are unchanged, so an unintended side effect fails the run
@@ -216,11 +219,24 @@ form.
 
    Add the same two to your Vercel project (*Settings → Environment Variables*) and redeploy.
 
-5. **Sign in.** Open Settings → Cloud sync, enter your email, then either open the emailed link or
-   type the **8-digit code** from the same email into the code box.
+5. **Configure email auth (this is the fix for “email rate limit exceeded”).** The app signs in with
+   **email and password**, which sends no email. Supabase's built-in mailer, by contrast, allows only
+   a couple of messages per hour, so a magic-link-first flow fails the moment you retry. Turn
+   confirmation emails off as well, so creating an account sends nothing either:
 
-   The code path exists because it has no redirect to misconfigure, so it works even before step 3
-   is done. The link path is the nicer one once the allow-list is right.
+   ```bash
+   npm run supabase:auth:email
+   ```
+
+   That patches **only** `external_email_enabled`, `mailer_autoconfirm` and `password_min_length`,
+   then reads the config back and asserts the redirect URLs were not disturbed. Pass
+   `--require-confirmation` to reverse it once you connect custom SMTP. Password reset still emails a
+   link, and is the only routine email the app triggers.
+
+6. **Sign in.** The app now opens on the sign-in page — the planner is behind it, so nothing is
+   reachable until you have a session. Create an account with an email address and a password (at
+   least six characters), then sign in. A magic-link / 8-digit-code fallback lives under
+   “Email me a code” on the sign-in screen.
 
    On first sign-in the app decides what to do automatically:
 
@@ -235,9 +251,11 @@ form.
 | `npm run supabase:db:push` | Apply `supabase/migrations/*.sql` to the hosted database |
 | `npm run supabase:db:reset` | Re-apply all migrations from scratch (destructive) |
 | `npm run supabase:auth:set` | Patch **only** `site_url` + `uri_allow_list` (needs a PAT) |
+| `npm run supabase:auth:email` | Configure email + password auth: enable the provider, skip confirmation emails, 6-character minimum (needs a PAT) |
 | `npm run supabase:config:push` | Push the whole `supabase/config.toml` (needs a PAT) — read the warning above first |
 | `npm run supabase:check` | Verify the schema exists and that RLS actually blocks the publishable key |
 | `npm run supabase:auth:check` | Verify the email provider works and whether Auth honours the production redirect URL |
+| `npm run supabase:auth:password` | Create a throwaway account and verify email + password sign-up / sign-in / RLS, sending no email |
 
 `supabase:auth:set` needs a **Personal Access Token** (<https://supabase.com/dashboard/account/tokens>),
 because auth configuration is Management API data that a Postgres password cannot reach. Database-only
@@ -258,7 +276,9 @@ writes to `~/.supabase`, which fails in a restricted or sandboxed environment.
 | Secret key can read (proves the table is real, not missing) | ✅ |
 | Email provider reachable and mailer accepts a send | ✅ HTTP 200 |
 | Auth honours the production redirect URL | ✅ now returns `https://anusree-daily-tracker.vercel.app`, not `localhost:3000` |
-| Email confirmations and 8-digit OTP left intact by the config change | ✅ asserted before/after |
+| Email + password sign-up returns a session immediately and sends no email | ✅ verified against the live project |
+| Email + password sign-in issues a session; a wrong password is rejected | ✅ verified against the live project |
+| Confirmation emails disabled while redirect URLs stay untouched | ✅ asserted before/after by `set-auth-email.mjs` |
 
 ---
 
@@ -285,7 +305,9 @@ writes to `~/.supabase`, which fails in a restricted or sandboxed environment.
   server-side, for a cron worker.
 - **The session** is stored as a refresh token in `localStorage` for this origin, with automatic
   refresh.
-- **Signing out never blocks the app.** It simply stops mirroring; your local data is untouched.
+- **Sign-in is required** whenever a Supabase project is configured: the first screen is the
+  login / sign-up page, and signing out returns you to it. Your local data is never deleted by
+  signing out. A deployment with no credentials keeps running as a purely local planner.
 - **Nothing is uploaded** until you explicitly sign in.
 
 ### Deleting cloud data

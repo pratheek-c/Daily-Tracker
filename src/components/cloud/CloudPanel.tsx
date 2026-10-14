@@ -4,7 +4,6 @@ import {
   CloudUpload,
   KeyRound,
   LogOut,
-  Mail,
   RefreshCw,
   ShieldCheck,
   Trash2,
@@ -18,8 +17,6 @@ import {
   Chip,
   ConfirmDialog,
   ConfirmDialogContent,
-  Field,
-  Input,
   Switch,
 } from '@/components/ui'
 import { useCloud } from '@/app/CloudContext'
@@ -36,8 +33,6 @@ import { cn } from '@/lib/utils'
  */
 export function CloudPanel() {
   const cloud = useCloud()
-  const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -128,91 +123,16 @@ export function CloudPanel() {
           <p className="text-xs text-[var(--fg-muted)]">Checking your session…</p>
         ) : null}
 
+        {/*
+          The signed-out form lives on the app's first screen (AuthPage), which
+          gates every route. This branch is only reachable if sign-out happens
+          while Settings is already mounted, so it is a pointer rather than a
+          second, divergent login form.
+        */}
         {cloud.status === 'signed-out' ? (
-          <form
-            className="space-y-3"
-            onSubmit={async (event) => {
-              event.preventDefault()
-              setBusy(true)
-              try {
-                const sent = await cloud.signInWithEmail(email)
-                if (sent) setNotice(null)
-              } finally {
-                setBusy(false)
-              }
-            }}
-          >
-            <Field
-              label="Email address"
-              hint="We email you a sign-in link and a numeric code. Either one works."
-              error={cloud.error ?? undefined}
-              required
-            >
-              <Input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-              />
-            </Field>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="submit" size="sm" disabled={busy || cloud.sending}>
-                <Mail className={cn((busy || cloud.sending) && 'animate-pulse')} />
-                {cloud.sending ? 'Sending…' : 'Email me a sign-in link'}
-              </Button>
-            </div>
-
-            {/*
-              The code path is offered first-class rather than as a fallback,
-              because a magic *link* only works once the project's redirect
-              allow-list includes this origin, whereas a code verifies directly
-              against the auth server with no redirect involved.
-            */}
-            {cloud.linkSentTo ? (
-              <div className="space-y-3 rounded-2xl border border-[var(--line)] p-3">
-                <p className="text-[0.7rem] leading-relaxed text-[var(--color-mint-deep)]">
-                  Email sent to <strong>{cloud.linkSentTo}</strong>. It contains a sign-in link and an
-                  8-digit code.
-                </p>
-                <Field
-                  label="Enter the code from the email"
-                  hint="This works even if the link leads somewhere unexpected."
-                >
-                  <Input
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={10}
-                    value={code}
-                    onChange={(event) => setCode(event.target.value.replace(/[^\d]/g, ''))}
-                    placeholder="12345678"
-                    className="w-40 tracking-[0.3em]"
-                  />
-                </Field>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={cloud.verifying || code.length < 6}
-                  onClick={async () => {
-                    setBusy(true)
-                    try {
-                      const ok = await cloud.verifyEmailCode(cloud.linkSentTo ?? email, code)
-                      if (ok) setNotice('Signed in. Your planner will sync from now on.')
-                    } finally {
-                      setBusy(false)
-                    }
-                  }}
-                >
-                  <KeyRound className={cn(cloud.verifying && 'animate-pulse')} />
-                  {cloud.verifying ? 'Verifying…' : 'Verify code'}
-                </Button>
-                <p className="text-[0.65rem] text-[var(--fg-subtle)]">
-                  Check your spam folder if nothing arrives within a minute. Open the link in{' '}
-                  <em>this</em> browser for it to sign you in here.
-                </p>
-              </div>
-            ) : null}
-          </form>
+          <p className="rounded-xl bg-[var(--surface-3)] px-3 py-2 text-[0.7rem] leading-relaxed text-[var(--fg-muted)]">
+            You are signed out. Reload the app to reach the sign-in page.
+          </p>
         ) : null}
 
         {cloud.status === 'signed-in' ? (

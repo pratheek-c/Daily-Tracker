@@ -85,10 +85,12 @@ const checks = [
   // in a browser bundle would be a serious vulnerability, not a style issue.
   ['NO secret key in the bundle', !/sb_secret_[A-Za-z0-9_-]{10,}/.test(allSource)],
   ['NO service_role JWT in the bundle', !/service_role/.test(allSource)],
-  // The sign-in UI must actually have shipped, including the code path that
-  // works before a redirect allow-list is configured.
-  ['sign-in UI shipped', allSource.includes('Email me a sign-in link')],
-  ['code-based sign-in shipped', allSource.includes('Enter the code from the email')],
+  // The first-gate auth screen must actually have shipped: both the login and
+  // sign-up affordances, the email + password credential, and the code fallback
+  // that works before a redirect allow-list is configured.
+  ['login / sign-up page shipped', allSource.includes('Create account')],
+  ['password sign-in shipped', allSource.includes('At least 6 characters')],
+  ['code-based sign-in shipped', allSource.includes('Code from the email')],
   ['cloud sync panel shipped', allSource.includes('Cloud sync')],
 ]
 
