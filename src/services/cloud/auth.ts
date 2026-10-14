@@ -421,6 +421,9 @@ export function useCloudAuth(): CloudAuthState {
     setLinkSentTo(null)
     setResetSentTo(null)
     setRecovering(false)
+    // The PWA caches the app shell; drop it so a signed-out reload hits the edge
+    // middleware and is sent to /auth rather than served from the cache.
+    navigator.serviceWorker?.controller?.postMessage({ type: 'adt:clear-shell' })
   }, [client])
 
   const verifyEmailCode = useCallback(

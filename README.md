@@ -307,6 +307,11 @@ writes to `~/.supabase`, which fails in a restricted or sandboxed environment.
   server-side, for a cron worker.
 - **The session** is stored as a refresh token in `localStorage` for this origin, with automatic
   refresh.
+- **Edge middleware gates every route.** `middleware.ts` runs on Vercel and redirects signed-out
+  requests for any app path to `/auth` — before the static shell is served — while leaving assets,
+  the auth page and PKCE callbacks open. The browser client persists its session in cookies via
+  `@supabase/ssr`, which is what makes the session readable at the edge. Signing out also clears the
+  service-worker shell cache, so a reload cannot be answered from cache instead of the middleware.
 - **Sign-in is required** whenever a Supabase project is configured: the first screen is the
   login / sign-up page, and signing out returns you to it. Your local data is never deleted by
   signing out. A deployment with no credentials keeps running as a purely local planner.

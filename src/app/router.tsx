@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react'
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, useSearchParams } from 'react-router-dom'
 import { AppShell } from '@/app/AppShell'
+import { AuthPage } from '@/pages/AuthPage'
+import { useCloud } from '@/app/CloudContext'
 import { Mascot } from '@/components/mascots/Mascot'
 
 /**
@@ -35,7 +37,25 @@ function page(element: React.ReactNode) {
   return <Suspense fallback={<PageFallback />}>{element}</Suspense>
 }
 
+/**
+ * `/auth` is the one public route and the target of the edge middleware's
+ * redirect. Once a session exists it forwards to the `next` path an
+ * unauthenticated visit tried to open, or to the dashboard.
+ */
+function AuthRoute() {
+  const cloud = useCloud()
+  const [params] = useSearchParams()
+
+  if (cloud.status === 'signed-in') {
+    const next = params.get('next')
+    const target = next && next.startsWith('/') && !next.startsWith('//') ? next : '/'
+    return <Navigate to={target} replace />
+  }
+  return <AuthPage />
+}
+
 export const router = createBrowserRouter([
+  { path: '/auth', element: <AuthRoute /> },
   {
     path: '/',
     element: <AppShell />,

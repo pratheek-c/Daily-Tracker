@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Plus, RefreshCw, X } from 'lucide-react'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -9,7 +9,7 @@ import { PRIMARY_NAV_ITEMS } from '@/config/navigation'
 import { useApp } from '@/app/AppContext'
 import { useCloud } from '@/app/CloudContext'
 import { useNotificationScheduler } from '@/hooks/useNotifications'
-import { AuthPage, PasswordRecoveryPage } from '@/pages/AuthPage'
+import { PasswordRecoveryPage } from '@/pages/AuthPage'
 import { cn } from '@/lib/utils'
 import { Mascot } from '@/components/mascots/Mascot'
 
@@ -48,7 +48,7 @@ export function AppShell() {
    * nothing to sign in to.
    */
   if (cloud.configured && cloud.status !== 'signed-in') {
-    return cloud.status === 'loading' ? <BootScreen error={null} /> : <AuthPage />
+    return cloud.status === 'loading' ? <BootScreen error={null} /> : <Navigate to="/auth" replace />
   }
 
   // A password-recovery link signs the user in; ask for the new password first.

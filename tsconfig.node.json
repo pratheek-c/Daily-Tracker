@@ -2,7 +2,9 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "ES2023",
-    "lib": ["ES2023"],
+    // `middleware.ts` runs on the Edge runtime and uses the Web `Request`,
+    // `Response` and `URL` globals, so the DOM lib is needed alongside Node's.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
 
@@ -23,5 +25,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts", "vitest.config.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts", "middleware.ts"]
 }

@@ -17,7 +17,7 @@
  * the cached shell when the network is unavailable.
  */
 
-const VERSION = 'v1'
+const VERSION = 'v2'
 const SHELL_CACHE = `adt-shell-${VERSION}`
 const PRECACHE = `adt-precache-${VERSION}`
 
@@ -115,7 +115,14 @@ self.addEventListener('fetch', (event) => {
  */
 self.addEventListener('message', (event) => {
   const data = event.data
-  if (!data || data.type !== 'adt:notify' || !data.title) return
+  if (!data) return
+  // Sign-out clears the cached shell so the next navigation is forced through
+  // the edge middleware instead of being answered from this cache.
+  if (data.type === 'adt:clear-shell') {
+    event.waitUntil(caches.delete(SHELL_CACHE))
+    return
+  }
+  if (data.type !== 'adt:notify' || !data.title) return
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body || '',

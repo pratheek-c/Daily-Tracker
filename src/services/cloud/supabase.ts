@@ -10,7 +10,8 @@
  * must never be added to them. Row Level Security in
  * `supabase/migrations/0001_records.sql` scopes every table to `auth.uid()`.
  */
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim()
 const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim()
@@ -142,11 +143,13 @@ let client: SupabaseClient<Database> | null = null
 export function getSupabase(): SupabaseClient<Database> | null {
   if (!isCloudConfigured) return null
   if (!client) {
-    client = createClient<Database>(url, anonKey, {
+    // `createBrowserClient` persists the session in cookies rather than
+    // localStorage. Cookies are the only place a server-side check can read the
+    // session from, which is what lets `middleware.ts` refuse app routes before
+    // the SPA is even served. The cookie is `sb-<project-ref>-auth-token`, split
+    // into numbered chunks when the session outgrows one cookie.
+    client = createBrowserClient<Database>(url, anonKey, {
       auth: {
-        // The session is kept in localStorage so a reload does not sign you out
-        // mid-session. Only the refresh token is stored, and it is scoped to
-        // this origin.
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
