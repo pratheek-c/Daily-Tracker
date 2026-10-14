@@ -187,13 +187,25 @@ form.
    | | `http://localhost:5173/**` |
    | | `http://127.0.0.1:5173/**` |
 
-   The same values live in `supabase/config.toml`; `npm run supabase:config:push` applies them
-   from the file, but that command needs a **Personal Access Token** (auth configuration is
-   Management API data, which a Postgres password cannot reach):
+   The same values live in `supabase/config.toml`. To apply them from the command line:
 
    ```bash
-   SUPABASE_ACCESS_TOKEN=sbp_xxx npm run supabase:config:push
+   npm run supabase:auth:set
    ```
+
+   That script patches **only** `site_url` and `uri_allow_list` through the Management API. It
+   deliberately does not use `supabase config push`, and the reason is worth knowing:
+
+   > **Do not run `supabase config push` on this project.** `supabase init` writes a config full of
+   > *defaults*, and `config push` pushes every property it declares. On this project that would have
+   > flipped `auth.email.enable_confirmations` from `true` to `false` — silently removing email
+   > verification — shortened the email OTP from 8 to 6 digits, and rewritten pooler, MFA and storage
+   > settings. `supabase/config.toml` in this repository has since been aligned to the hosted values
+   > so a future push is no longer dangerous, but the surgical script remains the safer default.
+
+   `scripts/set-auth-redirects.mjs` reads the config back before and after the change and asserts that
+   email confirmations and the OTP length are unchanged, so an unintended side effect fails the run
+   rather than passing silently.
 
 4. **Add the environment variables.** Copy `.env.example` to `.env.local` and fill in:
 
@@ -222,9 +234,15 @@ form.
 | --- | --- |
 | `npm run supabase:db:push` | Apply `supabase/migrations/*.sql` to the hosted database |
 | `npm run supabase:db:reset` | Re-apply all migrations from scratch (destructive) |
-| `npm run supabase:config:push` | Push `supabase/config.toml` (incl. redirect URLs) to the project — needs a PAT |
+| `npm run supabase:auth:set` | Patch **only** `site_url` + `uri_allow_list` (needs a PAT) |
+| `npm run supabase:config:push` | Push the whole `supabase/config.toml` (needs a PAT) — read the warning above first |
 | `npm run supabase:check` | Verify the schema exists and that RLS actually blocks the publishable key |
 | `npm run supabase:auth:check` | Verify the email provider works and whether Auth honours the production redirect URL |
+
+`supabase:auth:set` needs a **Personal Access Token** (<https://supabase.com/dashboard/account/tokens>),
+because auth configuration is Management API data that a Postgres password cannot reach. Database-only
+commands (`db push`, `db reset`) need only `SUPABASE_DB_URL`. Put the token in `.env.local` as
+`SUPABASE_ACCESS_TOKEN` and revoke it once setup is done — the configuration it writes persists.
 
 The scripts route through `scripts/run-supabase.mjs`, which invokes the bundled Go binary directly
 with `HOME` redirected inside the project. The stock `npx supabase` launcher is Bun-compiled and
@@ -239,7 +257,8 @@ writes to `~/.supabase`, which fails in a restricted or sandboxed environment.
 | Anonymous insert rejected | ✅ HTTP 401 |
 | Secret key can read (proves the table is real, not missing) | ✅ |
 | Email provider reachable and mailer accepts a send | ✅ HTTP 200 |
-| Auth honours the production redirect URL | ⚠️ **No** — fell back to `http://localhost:3000` until step 3 is done |
+| Auth honours the production redirect URL | ✅ now returns `https://anusree-daily-tracker.vercel.app`, not `localhost:3000` |
+| Email confirmations and 8-digit OTP left intact by the config change | ✅ asserted before/after |
 
 ---
 

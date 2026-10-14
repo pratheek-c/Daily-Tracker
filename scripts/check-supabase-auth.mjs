@@ -55,22 +55,36 @@ try {
   const link = await linkResponse.json().catch(() => ({}))
 
   // GoTrue silently falls back to the project's Site URL when a redirect is not
-  // allow-listed, so the returned action_link reveals which one won.
+  // allow-listed, and when it *is* allow-listed it may normalise the value down
+  // to the matching origin. So the test is whether the returned origin is the
+  // app's origin — a localhost result means the allow-list is still wrong.
   const actionLink = String(link.action_link ?? '')
-  const chosenRedirect = actionLink ? new URL(actionLink).searchParams.get('redirect_to') : null
-  const honoured = chosenRedirect !== null && chosenRedirect.startsWith(target)
-  const fellBack = chosenRedirect !== null && !honoured
+  const chosen = actionLink ? new URL(actionLink).searchParams.get('redirect_to') : null
+  const chosenOrigin = chosen ? new URL(chosen).origin : null
+  const targetOrigin = new URL(target).origin
+  const honoured = chosenOrigin === targetOrigin
+  const fellBack = chosenOrigin !== null && !honoured
 
   console.log(`generate magic link  : HTTP ${linkResponse.status}`)
   console.log(`requested redirect   : ${target}`)
-  console.log(`redirect Auth chose  : ${chosenRedirect ?? '(none returned)'}`)
+  console.log(`redirect Auth chose  : ${chosen ?? '(none returned)'}`)
   console.log(
     `allow-list           : ${
       honoured
-        ? 'ACCEPTS the production URL — magic links will work'
+        ? 'ACCEPTS the production URL — the emailed link will sign you in'
         : fellBack
-          ? 'IGNORED it and fell back — add the URL in Authentication → URL Configuration'
+          ? `IGNORED it and fell back to ${chosenOrigin} — add ${targetOrigin}/** in Authentication → URL Configuration`
           : 'could not be determined'
+    }`,
+  )
+
+  // The emailed code path does not depend on any of this, so report it too.
+  const otpPresent = typeof link.email_otp === 'string' && link.email_otp.length > 0
+  console.log(
+    `code path            : ${
+      otpPresent
+        ? `the same email carries a ${link.email_otp.length}-digit code, which needs no redirect`
+        : 'no code returned by the admin API'
     }`,
   )
 } catch (error) {
