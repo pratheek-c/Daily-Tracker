@@ -27,3 +27,6 @@ Thumbs.db
 
 .vercel
 .env*
+
+# Supabase CLI working directory (config + access token live here)
+.sandbox

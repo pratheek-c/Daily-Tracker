@@ -12,10 +12,20 @@ export interface CloudAuthState {
   email: string | null
   /** True while a magic link is being requested. */
   sending: boolean
+  /** True while a typed code is being verified. */
+  verifying: boolean
   error: string | null
   /** Set once a magic link has been emailed, so the UI can say so. */
   linkSentTo: string | null
   signInWithEmail: (email: string) => Promise<boolean>
+  /**
+   * Verify the numeric code that the same email carries.
+   *
+   * This is the reliable path: a magic *link* has to bounce through a redirect
+   * URL that the project must have allow-listed, whereas a code is verified
+   * directly against GoTrue and needs no redirect at all.
+   */
+  verifyEmailCode: (email: string, code: string) => Promise<boolean>
   signOut: () => Promise<void>
 }
 
@@ -35,6 +45,7 @@ export function useCloudAuth(): CloudAuthState {
   const [session, setSession] = useState<Session | null>(null)
   const [sessionLoaded, setSessionLoaded] = useState(false)
   const [sending, setSending] = useState(false)
+  const [verifying, setVerifying] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [linkSentTo, setLinkSentTo] = useState<string | null>(null)
 
@@ -117,15 +128,54 @@ export function useCloudAuth(): CloudAuthState {
     setLinkSentTo(null)
   }, [client])
 
+  const verifyEmailCode = useCallback(
+    async (email: string, code: string) => {
+      if (!client) {
+        setError('Cloud sync is not configured for this deployment.')
+        return false
+      }
+      const trimmedEmail = email.trim()
+      const trimmedCode = code.replace(/\s+/g, '')
+      if (!/^\d{6,10}$/.test(trimmedCode)) {
+        setError('Enter the numeric code from the email (it is 6 to 8 digits).')
+        return false
+      }
+      setVerifying(true)
+      setError(null)
+      try {
+        const { error: verifyError } = await client.auth.verifyOtp({
+          email: trimmedEmail,
+          token: trimmedCode,
+          type: 'email',
+        })
+        if (verifyError) throw verifyError
+        setLinkSentTo(null)
+        return true
+      } catch (cause) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : 'That code could not be verified. Check it and try again.',
+        )
+        return false
+      } finally {
+        setVerifying(false)
+      }
+    },
+    [client],
+  )
+
   return {
     status,
     session,
     user: session?.user ?? null,
     email: session?.user?.email ?? null,
     sending,
+    verifying,
     error,
     linkSentTo,
     signInWithEmail,
+    verifyEmailCode,
     signOut,
   }
 }

@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils'
 export function CloudPanel() {
   const cloud = useCloud()
   const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -143,7 +144,7 @@ export function CloudPanel() {
           >
             <Field
               label="Email address"
-              hint="We email you a one-time sign-in link. No password to remember."
+              hint="We email you a sign-in link and a numeric code. Either one works."
               error={cloud.error ?? undefined}
               required
             >
@@ -161,12 +162,55 @@ export function CloudPanel() {
                 {cloud.sending ? 'Sending…' : 'Email me a sign-in link'}
               </Button>
             </div>
+
+            {/*
+              The code path is offered first-class rather than as a fallback,
+              because a magic *link* only works once the project's redirect
+              allow-list includes this origin, whereas a code verifies directly
+              against the auth server with no redirect involved.
+            */}
             {cloud.linkSentTo ? (
-              <p className="rounded-xl bg-[var(--color-mint)]/50 px-3 py-2 text-[0.7rem] text-[var(--color-mint-deep)]">
-                A sign-in link is on its way to <strong>{cloud.linkSentTo}</strong>. Open it in this
-                browser to finish signing in. Check your spam folder if it does not arrive within a
-                minute.
-              </p>
+              <div className="space-y-3 rounded-2xl border border-[var(--line)] p-3">
+                <p className="text-[0.7rem] leading-relaxed text-[var(--color-mint-deep)]">
+                  Email sent to <strong>{cloud.linkSentTo}</strong>. It contains a sign-in link and an
+                  8-digit code.
+                </p>
+                <Field
+                  label="Enter the code from the email"
+                  hint="This works even if the link leads somewhere unexpected."
+                >
+                  <Input
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={10}
+                    value={code}
+                    onChange={(event) => setCode(event.target.value.replace(/[^\d]/g, ''))}
+                    placeholder="12345678"
+                    className="w-40 tracking-[0.3em]"
+                  />
+                </Field>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={cloud.verifying || code.length < 6}
+                  onClick={async () => {
+                    setBusy(true)
+                    try {
+                      const ok = await cloud.verifyEmailCode(cloud.linkSentTo ?? email, code)
+                      if (ok) setNotice('Signed in. Your planner will sync from now on.')
+                    } finally {
+                      setBusy(false)
+                    }
+                  }}
+                >
+                  <KeyRound className={cn(cloud.verifying && 'animate-pulse')} />
+                  {cloud.verifying ? 'Verifying…' : 'Verify code'}
+                </Button>
+                <p className="text-[0.65rem] text-[var(--fg-subtle)]">
+                  Check your spam folder if nothing arrives within a minute. Open the link in{' '}
+                  <em>this</em> browser for it to sign you in here.
+                </p>
+              </div>
             ) : null}
           </form>
         ) : null}

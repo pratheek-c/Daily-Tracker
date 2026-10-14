@@ -163,25 +163,36 @@ form.
 
 1. **Create a project** at [supabase.com](https://supabase.com).
 
-2. **Create the schema.** Open *SQL Editor → New query*, paste the contents of
-   [`supabase/migrations/0001_records.sql`](supabase/migrations/0001_records.sql) and run it. This
-   creates the `records`, `reminder_jobs` and `push_subscriptions` tables, the `record_counts` view,
-   the `server_at` trigger, and enables Row Level Security with owner-scoped policies.
-
-   With the Supabase CLI instead:
+2. **Create the schema.** Either run the CLI against the project, or paste the SQL.
 
    ```bash
-   supabase link --project-ref <your-project-ref>
-   supabase db push
+   # Applies supabase/migrations/*.sql over a direct Postgres connection.
+   npm run supabase:db:push
    ```
 
-3. **Enable email sign-in.** *Authentication → Providers → Email*: turn it on and make sure
-   **magic link / OTP** is enabled. Under *Authentication → URL Configuration* add every URL the app
-   is served from to **Redirect URLs**, for example:
+   Or open *SQL Editor → New query*, paste [supabase/setup.sql](supabase/setup.sql)
+   and run it. Both are idempotent; `setup.sql` is the same migration in one block.
 
-   ```
-   http://localhost:5173/**
-   https://anusree-daily-tracker.vercel.app/**
+3. **Allow your redirect URLs.** This step is easy to skip and produces a confusing failure:
+   GoTrue **silently ignores** a `redirectTo` that is not allow-listed and falls back to the
+   project's Site URL, so the magic link lands on `http://localhost:3000` with nothing there.
+
+   *Authentication → URL Configuration*:
+
+   | Field | Value |
+   | --- | --- |
+   | Site URL | `https://anusree-daily-tracker.vercel.app` |
+   | Redirect URLs | `https://anusree-daily-tracker.vercel.app/**` |
+   | | `https://anusree-daily-tracker-*.vercel.app/**` |
+   | | `http://localhost:5173/**` |
+   | | `http://127.0.0.1:5173/**` |
+
+   The same values live in `supabase/config.toml`; `npm run supabase:config:push` applies them
+   from the file, but that command needs a **Personal Access Token** (auth configuration is
+   Management API data, which a Postgres password cannot reach):
+
+   ```bash
+   SUPABASE_ACCESS_TOKEN=sbp_xxx npm run supabase:config:push
    ```
 
 4. **Add the environment variables.** Copy `.env.example` to `.env.local` and fill in:
@@ -191,15 +202,46 @@ form.
    VITE_SUPABASE_ANON_KEY=<anon or publishable key>
    ```
 
-   Then add the same two variables to your Vercel project (*Project → Settings → Environment
-   Variables*) and redeploy.
+   Add the same two to your Vercel project (*Settings → Environment Variables*) and redeploy.
 
-5. **Sign in.** Open Settings → Cloud sync, enter your email, and click the link that arrives. On
-   first sign-in the app decides what to do automatically:
+5. **Sign in.** Open Settings → Cloud sync, enter your email, then either open the emailed link or
+   type the **8-digit code** from the same email into the code box.
+
+   The code path exists because it has no redirect to misconfigure, so it works even before step 3
+   is done. The link path is the nicer one once the allow-list is right.
+
+   On first sign-in the app decides what to do automatically:
 
    - if this device already holds real work, it uploads that once and then pulls;
    - if this is a fresh install, it skips the upload and simply downloads — so a new device cannot
      overwrite your account with empty defaults.
+
+### Supabase scripts
+
+| Script | Purpose |
+| --- | --- |
+| `npm run supabase:db:push` | Apply `supabase/migrations/*.sql` to the hosted database |
+| `npm run supabase:db:reset` | Re-apply all migrations from scratch (destructive) |
+| `npm run supabase:config:push` | Push `supabase/config.toml` (incl. redirect URLs) to the project — needs a PAT |
+| `npm run supabase:check` | Verify the schema exists and that RLS actually blocks the publishable key |
+| `npm run supabase:auth:check` | Verify the email provider works and whether Auth honours the production redirect URL |
+
+The scripts route through `scripts/run-supabase.mjs`, which invokes the bundled Go binary directly
+with `HOME` redirected inside the project. The stock `npx supabase` launcher is Bun-compiled and
+writes to `~/.supabase`, which fails in a restricted or sandboxed environment.
+
+### Verified behaviour
+
+| Check | Result |
+| --- | --- |
+| `records`, `reminder_jobs`, `push_subscriptions`, `record_counts` exist | ✅ |
+| Publishable key reads 0 rows (RLS enforcing) | ✅ HTTP 200, 0 rows |
+| Anonymous insert rejected | ✅ HTTP 401 |
+| Secret key can read (proves the table is real, not missing) | ✅ |
+| Email provider reachable and mailer accepts a send | ✅ HTTP 200 |
+| Auth honours the production redirect URL | ⚠️ **No** — fell back to `http://localhost:3000` until step 3 is done |
+
+---
 
 ### How synchronisation works
 

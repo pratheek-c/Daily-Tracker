@@ -14,7 +14,14 @@
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "test:watch": "vitest",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "verify:deploy": "node scripts/verify-deployment.mjs",
+    "verify:bundle": "node scripts/verify-bundle.mjs",
+    "supabase:db:push": "node scripts/supabase-cli.mjs db push",
+    "supabase:db:reset": "node scripts/supabase-cli.mjs db reset",
+    "supabase:config:push": "node scripts/supabase-cli.mjs config push",
+    "supabase:check": "node scripts/supabase-verify.mjs schema",
+    "supabase:auth:check": "node scripts/supabase-verify.mjs auth"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -71,6 +78,7 @@
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.13.0",
     "sharp": "^0.35.5",
+    "supabase": "^2.121.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.71.2",
