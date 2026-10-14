@@ -24,6 +24,7 @@ import {
 import { Logo } from '@/components/layout/Logo'
 import { Mascot } from '@/components/mascots/Mascot'
 import { useCloud } from '@/app/CloudContext'
+import { useApp } from '@/app/AppContext'
 import { cn } from '@/lib/utils'
 
 type Mode = 'signin' | 'signup'
@@ -41,11 +42,16 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  */
 export function AuthPage() {
   const cloud = useCloud()
+  const { saveSettings } = useApp()
 
   const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [preferredName, setPreferredName] = useState('')
+  const [course, setCourse] = useState('')
+  const [institution, setInstitution] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -83,6 +89,10 @@ export function AuthPage() {
   async function handleSignUp(event: FormEvent) {
     event.preventDefault()
     clearFeedback()
+    if (!fullName.trim()) {
+      setLocalError('Please tell us your name.')
+      return
+    }
     if (!EMAIL_RE.test(email.trim())) {
       setLocalError('Enter a valid email address.')
       return
@@ -95,7 +105,19 @@ export function AuthPage() {
       setLocalError('The two passwords do not match.')
       return
     }
-    const outcome = await cloud.signUpWithPassword(email, password)
+    // Fall back to the first word of the full name when no nickname is given.
+    const chosenName = preferredName.trim() || fullName.trim().split(/\s+/)[0]
+    const outcome = await cloud.signUpWithPassword(email, password, {
+      fullName,
+      displayName: chosenName,
+      course,
+      institution,
+    })
+    if (outcome.ok && chosenName) {
+      // Greet the new account by name straight away; this is also the profile
+      // the sync engine will mirror once a session exists.
+      await saveSettings({ displayName: chosenName })
+    }
     if (outcome.ok && outcome.needsConfirmation) {
       setConfirmEmail(email.trim())
     } else if (outcome.ok) {
@@ -392,6 +414,45 @@ export function AuthPage() {
 
                 <TabsContent value="signup">
                   <form className="space-y-3" onSubmit={handleSignUp}>
+                    <Field label="Your name" required>
+                      <Input
+                        type="text"
+                        autoComplete="name"
+                        value={fullName}
+                        onChange={(event) => setFullName(event.target.value)}
+                        placeholder="Anusree Prakashan"
+                      />
+                    </Field>
+                    <Field
+                      label="What should we call you?"
+                      hint="Optional — used for greetings. Defaults to your first name."
+                    >
+                      <Input
+                        type="text"
+                        autoComplete="nickname"
+                        value={preferredName}
+                        onChange={(event) => setPreferredName(event.target.value)}
+                        placeholder="Anu"
+                      />
+                    </Field>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label="Course" hint="Optional">
+                        <Input
+                          type="text"
+                          value={course}
+                          onChange={(event) => setCourse(event.target.value)}
+                          placeholder="Computer Science"
+                        />
+                      </Field>
+                      <Field label="College" hint="Optional">
+                        <Input
+                          type="text"
+                          value={institution}
+                          onChange={(event) => setInstitution(event.target.value)}
+                          placeholder="Your college"
+                        />
+                      </Field>
+                    </div>
                     <Field label="Email address" required>
                       <Input
                         type="email"

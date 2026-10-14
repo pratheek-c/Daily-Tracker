@@ -58,7 +58,11 @@ export interface CloudAuthState {
    * the user to open the emailed link. When confirmations are switched off the
    * call signs in immediately and no email is sent at all.
    */
-  signUpWithPassword: (email: string, password: string) => Promise<SignUpOutcome>
+  signUpWithPassword: (
+    email: string,
+    password: string,
+    details?: SignUpDetails,
+  ) => Promise<SignUpOutcome>
   /** Send the “reset your password” email. Rate-limited like any other email. */
   sendPasswordReset: (email: string) => Promise<boolean>
   /** Re-send the signup confirmation email for an account that has not confirmed yet. */
@@ -74,6 +78,19 @@ export interface SignUpOutcome {
   ok: boolean
   /** True when the account exists but the email address must still be confirmed. */
   needsConfirmation: boolean
+}
+
+/**
+ * Profile details gathered at sign-up. They are stored in the Supabase user's
+ * `raw_user_meta_data`, so they travel with the account and are readable as
+ * `cloud.user.user_metadata` on any device. Every field except the name is
+ * optional — the app never blocks on them.
+ */
+export interface SignUpDetails {
+  fullName?: string
+  displayName?: string
+  course?: string
+  institution?: string
 }
 
 /** Where GoTrue should return the browser after an email link is opened. */
@@ -260,7 +277,7 @@ export function useCloudAuth(): CloudAuthState {
   )
 
   const signUpWithPassword = useCallback(
-    async (email: string, password: string): Promise<SignUpOutcome> => {
+    async (email: string, password: string, details?: SignUpDetails): Promise<SignUpOutcome> => {
       if (!client) {
         setError('Cloud sync is not configured for this deployment.')
         return { ok: false, needsConfirmation: false }
@@ -274,18 +291,32 @@ export function useCloudAuth(): CloudAuthState {
         setError('Passwords are at least 6 characters.')
         return { ok: false, needsConfirmation: false }
       }
+      // Only send keys that were actually filled in, so the metadata stays clean.
+      const data: Record<string, string> = {}
+      const put = (key: string, value: string | undefined) => {
+        const trimmedValue = value?.trim()
+        if (trimmedValue) data[key] = trimmedValue
+      }
+      put('full_name', details?.fullName)
+      put('display_name', details?.displayName)
+      put('course', details?.course)
+      put('institution', details?.institution)
+
       setSigningUp(true)
       setError(null)
       try {
-        const { data, error: signUpError } = await client.auth.signUp({
+        const { data: response, error: signUpError } = await client.auth.signUp({
           email: trimmed,
           password,
-          options: { emailRedirectTo: redirectTarget() },
+          options: {
+            emailRedirectTo: redirectTarget(),
+            ...(Object.keys(data).length > 0 ? { data } : {}),
+          },
         })
         if (signUpError) throw signUpError
         // With confirmations on, GoTrue returns a user but no session until the
         // emailed link is opened. With them off, the session is already here.
-        const needsConfirmation = !data.session
+        const needsConfirmation = !response.session
         return { ok: true, needsConfirmation }
       } catch (cause) {
         setError(friendlyAuthError(cause, 'Could not create your account.'))

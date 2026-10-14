@@ -89,6 +89,7 @@ const checks = [
   // sign-up affordances, the email + password credential, and the code fallback
   // that works before a redirect allow-list is configured.
   ['login / sign-up page shipped', allSource.includes('Create account')],
+  ['sign-up details form shipped', allSource.includes('What should we call you?')],
   ['password sign-in shipped', allSource.includes('At least 6 characters')],
   ['code-based sign-in shipped', allSource.includes('Code from the email')],
   ['cloud sync panel shipped', allSource.includes('Cloud sync')],

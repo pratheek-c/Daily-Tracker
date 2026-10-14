@@ -6,6 +6,7 @@
  * It creates a throwaway account, asserts that:
  *   - sign-up returns a session immediately (auto-confirm is on, so no email is
  *     sent — this is the fix for “email rate limit exceeded”),
+ *   - the profile details gathered at sign-up are stored as user metadata,
  *   - password sign-in issues a session,
  *   - a wrong password is rejected,
  *   - the session can read its own RLS-scoped rows,
@@ -20,6 +21,12 @@ if (!url || !publishable || !secret) {
 const base = url.replace(/\/$/, '')
 const email = `probe+${Date.now()}@anusree-tracker.test`
 const password = 'probe-password-123'
+const details = {
+  full_name: 'Probe Student',
+  display_name: 'Probe',
+  course: 'Testing',
+  institution: 'CI College',
+}
 
 let failures = 0
 function report(label, ok, detail = '') {
@@ -43,14 +50,22 @@ async function authPost(path, body, token) {
 
 let userId = null
 try {
-  // 1. Sign up.
-  const signup = await authPost('/auth/v1/signup', { email, password })
+  // 1. Sign up, carrying the profile details the form collects.
+  const signup = await authPost('/auth/v1/signup', { email, password, data: details })
   userId = signup.json?.user?.id ?? signup.json?.id ?? null
   const signupSession = Boolean(signup.json?.access_token)
   report(
     'sign-up returns a session (auto-confirm, no email)',
     signup.response.ok && signupSession,
     signupSession ? 'confirmed' : `HTTP ${signup.response.status} ${signup.json?.msg ?? ''}`,
+  )
+
+  // 1b. The details must survive on the account.
+  const meta = signup.json?.user?.user_metadata ?? {}
+  report(
+    'sign-up profile details stored as metadata',
+    meta.full_name === details.full_name && meta.course === details.course,
+    meta.full_name ? `name="${meta.full_name}"` : 'no metadata',
   )
 
   // 2. Wrong password is rejected.
@@ -64,6 +79,11 @@ try {
   const signin = await authPost('/auth/v1/token?grant_type=password', { email, password })
   const token = signin.json?.access_token ?? null
   report('password sign-in issues a session', Boolean(token), `HTTP ${signin.response.status}`)
+  report(
+    'metadata is returned with the session',
+    signin.json?.user?.user_metadata?.display_name === details.display_name,
+    `HTTP ${signin.response.status}`,
+  )
 
   // 4. The session can read its own RLS-scoped rows.
   if (token) {

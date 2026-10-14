@@ -234,9 +234,11 @@ chosen because it sends no email and therefore dodges the hosted mailer's tiny h
    link, and is the only routine email the app triggers.
 
 6. **Sign in.** The app now opens on the sign-in page — the planner is behind it, so nothing is
-   reachable until you have a session. Create an account with an email address and a password (at
-   least six characters), then sign in. A magic-link / 8-digit-code fallback lives under
-   “Email me a code” on the sign-in screen.
+   reachable until you have a session. Create an account with your name, an email address and a
+   password (at least six characters); the form also takes an optional preferred name, course and
+   college. Those details are saved to the Supabase account's user metadata, and the preferred name
+   (or the first word of your full name) becomes the greeting inside the app. A magic-link /
+   8-digit-code fallback lives under “Email me a code” on the sign-in screen.
 
    On first sign-in the app decides what to do automatically:
 
