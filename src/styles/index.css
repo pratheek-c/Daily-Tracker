@@ -1,0 +1,313 @@
+@import 'tailwindcss';
+
+/* ==========================================================================
+   Anusree's Daily Tracker — design tokens
+   White + warm ivory surfaces, blush pink & pastel lavender accents.
+   ========================================================================== */
+
+@theme {
+  --font-sans: 'Inter', 'Nunito', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Quicksand', 'Nunito', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Nunito', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-hand: 'Caveat', 'Nunito', cursive;
+
+  /* --- palette from the brief --- */
+  --color-ivory: #fffafc;
+  --color-blush: #f8c8dc;
+  --color-rose: #f2a7c3;
+  --color-lavender: #e8ddf8;
+  --color-babyblue: #ddeffc;
+  --color-mint: #ddf3e4;
+  --color-peach: #ffe4d6;
+  --color-ink: #37313d;
+  --color-ink-soft: #89818f;
+  --color-hairline: #f0e8ef;
+  --color-success: #80b99a;
+  --color-warning: #e9bd75;
+
+  /* deeper, contrast-safe variants of the pastels for text/icons */
+  --color-rose-deep: #b95f86;
+  --color-lavender-deep: #7561a8;
+  --color-sky-deep: #4d7fa8;
+  --color-mint-deep: #4f8a6c;
+  --color-peach-deep: #b5703f;
+  --color-sun-deep: #9a7326;
+  --color-ink-soft-strong: #6f6878;
+
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 1.875rem;
+
+  --shadow-soft: 0 1px 2px rgb(55 49 61 / 0.04), 0 8px 24px -12px rgb(185 95 134 / 0.18);
+  --shadow-card: 0 1px 3px rgb(55 49 61 / 0.05), 0 18px 40px -28px rgb(117 97 168 / 0.28);
+  --shadow-lift: 0 2px 6px rgb(55 49 61 / 0.06), 0 24px 54px -30px rgb(185 95 134 / 0.35);
+
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-twinkle: twinkle 3.2s ease-in-out infinite;
+  --animate-pop: pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-rise: rise 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-breathe: breathe 4.5s ease-in-out infinite;
+  --animate-sheen: sheen 2.4s linear infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.95;
+  }
+}
+
+@keyframes sheen {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Semantic surface tokens (light is the default; a soft "night" mode is
+   provided for the sleep pages and is intentionally gentle on the eyes).
+   -------------------------------------------------------------------------- */
+@layer base {
+  :root {
+    --surface: #ffffff;
+    --surface-2: #fffafc;
+    --surface-3: #fdf3f7;
+    --surface-raised: #ffffff;
+
+    --fg: #37313d;
+    --fg-muted: #89818f;
+    --fg-subtle: #a9a2b1;
+
+    --line: #f0e8ef;
+    --line-strong: #e5d9e5;
+
+    --accent: #f2a7c3;
+    --accent-ink: #b95f86;
+    --accent-soft: #fdeef4;
+    --accent-contrast: #ffffff;
+
+    --lavender-ink: #7561a8;
+    --lavender-soft: #f4effd;
+
+    --ring: #f2a7c3;
+    --overlay: rgb(55 49 61 / 0.42);
+
+    --c-study: #e8ddf8;
+    --c-study-ink: #7561a8;
+    --c-project: #ddeffc;
+    --c-project-ink: #4d7fa8;
+    --c-college: #ffe4d6;
+    --c-college-ink: #b5703f;
+    --c-assignment: #f8c8dc;
+    --c-assignment-ink: #b95f86;
+    --c-sleep: #dcd8f5;
+    --c-sleep-ink: #5f5aa8;
+    --c-meal: #ddf3e4;
+    --c-meal-ink: #4f8a6c;
+    --c-exercise: #d6f0ea;
+    --c-exercise-ink: #3f8577;
+    --c-break: #fdf0d8;
+    --c-break-ink: #9a7326;
+    --c-personal: #fbe2ee;
+    --c-personal-ink: #b3557f;
+    --c-other: #eeeeF2;
+    --c-other-ink: #6f6878;
+  }
+
+  .theme-night {
+    --surface: #211f2b;
+    --surface-2: #1a1823;
+    --surface-3: #2a2735;
+    --surface-raised: #2a2735;
+
+    --fg: #f4f1f8;
+    --fg-muted: #b3aac1;
+    --fg-subtle: #8d85a0;
+
+    --line: #363242;
+    --line-strong: #453f56;
+
+    --accent: #f2a7c3;
+    --accent-ink: #f8c8dc;
+    --accent-soft: #3a2c37;
+
+    --ring: #e8ddf8;
+    --overlay: rgb(10 8 16 / 0.6);
+
+    --c-study: #322a4a;
+    --c-study-ink: #cfc0f5;
+    --c-project: #23364a;
+    --c-project-ink: #b7d8f5;
+    --c-college: #40301f;
+    --c-college-ink: #f3c9a8;
+    --c-assignment: #43283a;
+    --c-assignment-ink: #f5bcd8;
+    --c-sleep: #2a2a4d;
+    --c-sleep-ink: #c3c2f0;
+    --c-meal: #23402f;
+    --c-meal-ink: #b3e0c4;
+    --c-exercise: #1f3d38;
+    --c-exercise-ink: #a6ddd0;
+    --c-break: #3f3620;
+    --c-break-ink: #e8cf9b;
+    --c-personal: #40293a;
+    --c-personal-ink: #f0bcd3;
+    --c-other: #302d3b;
+    --c-other-ink: #c5bfd0;
+  }
+
+  * {
+    border-color: var(--line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--surface-2);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior-y: none;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 0.4rem;
+  }
+
+  button {
+    font-family: inherit;
+  }
+
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+  }
+
+  /* Soft, unobtrusive scrollbars that match the pastel shell. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+    background-clip: content-box;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility paper-grain {
+  background-image:
+    radial-gradient(circle at 12% 18%, rgb(248 200 220 / 0.28) 0, transparent 42%),
+    radial-gradient(circle at 88% 8%, rgb(232 221 248 / 0.34) 0, transparent 46%),
+    radial-gradient(circle at 76% 92%, rgb(221 239 252 / 0.3) 0, transparent 44%);
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility text-balance-tight {
+  text-wrap: balance;
+}

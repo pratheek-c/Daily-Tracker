@@ -1,0 +1,29 @@
+# dependencies
+node_modules
+.npm-cache
+
+# build output
+dist
+dist-ssr
+dev-dist
+*.local
+
+# typescript
+node_modules/.tmp
+*.tsbuildinfo
+
+# tooling scratch
+.tmp
+coverage
+.vite
+
+# editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+*.log
+
+.vercel
+.env*

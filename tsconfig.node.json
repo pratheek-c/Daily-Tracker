@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": false,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    // `noEmit` cannot be combined with `allowImportingTsExtensions: false`, and
+    // a plain `tsc -b` would otherwise drop compiled `vite.config.js` next to the
+    // source file, where Vite would resolve it in preference to the TypeScript
+    // original. Emitting into `node_modules/.tmp` keeps the project root clean.
+    "noEmit": false,
+    "outDir": "./node_modules/.tmp/tsconfig-node",
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["vite.config.ts", "vitest.config.ts"]
+}
