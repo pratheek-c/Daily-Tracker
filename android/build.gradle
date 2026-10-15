@@ -24,6 +24,24 @@ allprojects {
     }
 }
 
+// Capacitor 8 compiles with a Java 21 toolchain. Its plugin modules declare one
+// themselves (`kotlin { jvmToolchain(21) }`), but the core `capacitor-android`
+// library and this app only set `compileOptions` — without a toolchain they would
+// compile with whatever JDK happens to run Gradle and fail with “invalid source
+// release: 21”. Pinning the toolchain on every Android module makes the JDK 21
+// that `settings.gradle` provisions (Foojay) apply consistently, everywhere.
+subprojects { subproject ->
+    ['com.android.application', 'com.android.library'].each { pluginId ->
+        subproject.plugins.withId(pluginId) {
+            subproject.java {
+                toolchain {
+                    languageVersion = JavaLanguageVersion.of(21)
+                }
+            }
+        }
+    }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }

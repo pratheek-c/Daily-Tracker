@@ -566,10 +566,30 @@ npm run android:build  # dist/ + cap sync + Gradle assembleDebug → an APK
 
 ### Prerequisites
 
-Gradle needs a **JDK 21** (Capacitor 8 targets Java 21) and the **Android SDK** — installing
-Android Studio gives you both. `npm run android:build` checks for them and prints what is missing rather
-than dumping raw Gradle output. Release builds also need a signing config (keystore) in
-`android/app/build.gradle` before the release APK is installable.
+You need **a JDK to run Gradle** (17–24) and the **Android SDK**. Capacitor 8 compiles with a
+Java 21 *toolchain*; you do **not** have to install JDK 21 yourself — `android/settings.gradle`
+declares the Foojay resolver and `android/gradle.properties` enables `auto-download`, so Gradle
+fetches JDK 21 on first build and applies it to every Android module via `android/build.gradle`.
+
+`npm run android:build` locates both the JDK and the SDK (env vars, `android/local.properties`, or
+the default install locations) and prints what it chose, rather than dumping raw Gradle output.
+Release builds also need a signing config (keystore) in `android/app/build.gradle` before the
+release APK is installable.
+
+### Local build troubleshooting
+
+- **“Cannot find a Java installation … languageVersion=21”** — Gradle could not obtain the toolchain.
+  Check that `org.gradle.java.installations.auto-download=true` is still in `android/gradle.properties`
+  and that the build has network access to the Gradle Plugin Portal on first run.
+- **“Cannot snapshot … .gitkeep: not a regular file”** — the project is inside OneDrive, which turned
+  the generated plugins folder's `.gitkeep` files into cloud-only reparse points. `npm run android:build`
+  deletes them after each `cap sync`; if you build from Android Studio instead, delete them by hand.
+- **“Could not move temporary workspace … to immutable location”** — a stale Gradle cache entry, usually
+  from an interrupted build or antivirus locking. Stop the daemons and retry:
+  `cd android && gradlew --stop`.
+
+The safest long-term fix for the last two is to keep the checkout somewhere outside a
+cloud-synced folder (OneDrive/Dropbox), which also makes Gradle's file watching far more reliable.
 
 The Android build is intentionally **not** part of the Vercel deploy: `.vercelignore`
 keeps `android/` out of the upload, and Vercel only ever runs `npm run build`.
