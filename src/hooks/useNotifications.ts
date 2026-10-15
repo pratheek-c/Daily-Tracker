@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useApp } from '@/app/AppContext'
 import {
   flushDueNotifications,
@@ -8,6 +8,12 @@ import {
 import {
   buildSleepReminderJobs,
 } from '@/services/notifications/reminders'
+import {
+  getNotificationPermission,
+  refreshNotificationPermission,
+  subscribeNotificationPermission,
+} from '@/services/notifications/permission'
+import { syncNativeReminders } from '@/services/notifications/native'
 import { plannedNights } from '@/services/scheduling/sleep-events'
 import { createDefaultSleepSchedule } from '@/config/defaults'
 import { getStorage } from '@/services/persistence'
@@ -21,8 +27,29 @@ import type { NotificationJob } from '@/types'
  * capability boundary documented in the README: there is no server, so a
  * closed browser cannot be woken at an exact minute.
  */
+/**
+ * The current notification permission, kept in sync across the browser and the
+ * native app. The native lookup is asynchronous, so this subscribes to a small
+ * store that is refreshed on mount.
+ */
+export function useNotificationPermission() {
+  const permission = useSyncExternalStore(
+    subscribeNotificationPermission,
+    getNotificationPermission,
+    getNotificationPermission,
+  )
+  useEffect(() => {
+    void refreshNotificationPermission()
+  }, [])
+  return permission
+}
+
 export function useNotificationScheduler(options: { enabled?: boolean } = {}) {
   const { data, revision, ready } = useApp()
+  // Resolving permission is asynchronous on native, so scheduling re-runs once
+  // it changes; otherwise the first schedule could be skipped while the state
+  // is still "unknown".
+  const permission = useNotificationPermission()
   const [pending, setPending] = useState(0)
   const [delivered, setDelivered] = useState(0)
   const [lastRun, setLastRun] = useState<number | null>(null)
@@ -70,12 +97,17 @@ export function useNotificationScheduler(options: { enabled?: boolean } = {}) {
       await storage.deleteNotificationJobs(existingSleepJobs.map((job) => job.id))
       await storage.putNotificationJobs(wanted)
 
-      setPending((await storage.listNotificationJobs()).length)
+      // Hand the full set to the OS as well, so the native app can deliver them
+      // while it is closed. This is a no-op on the web.
+      const allJobs = await storage.listNotificationJobs()
+      await syncNativeReminders(allJobs, permission)
+
+      setPending(allJobs.length)
       setLastRun(Date.now())
     } finally {
       rescheduling.current = false
     }
-  }, [data, enabled])
+  }, [data, enabled, permission])
 
   // Rebuild whenever underlying records change.
   useEffect(() => {

@@ -407,6 +407,9 @@ bedtime, and before noon the current night is still considered yesterday's.
 
 - Browser Notifications API with a **user-initiated permission flow** (Settings → Notifications, or
   the notification centre).
+- **Native scheduled notifications on Android** via `@capacitor/local-notifications`: the same
+  reminder jobs are handed to the OS, so they arrive **even when the app is closed**. Tapping one
+  opens the screen it belongs to (planner, tasks, habits, sleep or study).
 - A **test notification** button.
 - An **in-app notification centre** with delivery history, grouped by day and mark-as-read.
 - **Multi-reminder** support per block: at start time, 5, 10, 15, 30 and 60 minutes before, or any
@@ -424,11 +427,11 @@ bedtime, and before noon the current night is still considered yesterday's.
 
 ### The honest limitation
 
-Reminders are scheduled **in the browser while the app is open**. Neither JavaScript timers nor a
-service worker can wake a **closed** browser at an exact minute — that is a browser platform
-constraint, not a gap that a service worker can close.
+**On the web**, reminders are scheduled **in the browser while the app is open**. Neither JavaScript
+timers nor a service worker can wake a **closed** browser at an exact minute — that is a browser
+platform constraint, not a gap that a service worker can close.
 
-Therefore:
+Therefore, on the web:
 
 - Do **not** rely on this app as an alarm clock or as a guaranteed wake-up alarm.
 - If the tab is closed, no reminder fires at the moment it was due. When you next open the app, jobs
@@ -436,6 +439,18 @@ Therefore:
   spammed at you.
 - Genuinely reliable reminders for a closed browser require **server-side scheduling with Web Push**,
   which is **not** implemented in this local-first build. The optional path is described below.
+
+**The Android app does not share this limitation.** There, the materialised reminder jobs are given
+to the operating system, which delivers them whether or not the app is running:
+
+- The soonest **60** reminders are kept scheduled at a time (Android tolerates many, iOS caps near
+  64). Opening the app — or editing anything — re-syncs, so later reminders slide into the window.
+- Alarms are **inexact** by choice. Exact alarms would open the system “Alarms & reminders” screen on
+  every edit until granted, which is a worse experience than a nudge that may arrive a minute or two
+  late. Android can still delay alarms while the device is in Doze.
+- Nothing about the scheduling engine changes between platforms: the same `NotificationJob` records
+  drive browser delivery on the web and OS scheduling on Android. `syncNativeReminders` diffs against
+  the OS queue by id, so an edit never briefly unregisters a reminder that is about to fire.
 
 ### Optional: server-side Web Push (not implemented)
 
@@ -551,8 +566,8 @@ npm run android:build  # dist/ + cap sync + Gradle assembleDebug → an APK
 
 ### Prerequisites
 
-Gradle needs a **JDK 17 or newer** and the **Android SDK** — installing Android Studio
-gives you both. `npm run android:build` checks for them and prints what is missing rather
+Gradle needs a **JDK 21** (Capacitor 8 targets Java 21) and the **Android SDK** — installing
+Android Studio gives you both. `npm run android:build` checks for them and prints what is missing rather
 than dumping raw Gradle output. Release builds also need a signing config (keystore) in
 `android/app/build.gradle` before the release APK is installable.
 
@@ -565,6 +580,9 @@ keeps `android/` out of the upload, and Vercel only ever runs `npm run build`.
   client-side gate in `AppShell` and, decisively, Row Level Security still protect data.
 - **No service worker.** The bundle already lives on the device, so
   `registerServiceWorker` is skipped on native.
+- **Reminders become OS notifications.** The same reminder jobs are scheduled with Android through
+  `@capacitor/local-notifications`, so they arrive when the app is closed; tapping a reminder deep
+  links to the relevant screen. See [Notifications](#notifications-what-works-and-what-does-not).
 - **Sessions still use cookies.** `androidScheme: 'https'` serves the app from
   `https://localhost`, a real https origin, so `@supabase/ssr`'s cookies work in the WebView.
 - **Hardware back button** walks the router back to the dashboard before exiting.

@@ -46,11 +46,12 @@ import { Mascot, type MascotKind } from '@/components/ui'
 import { useApp } from '@/app/AppContext'
 import { ACCENT_META, type AccentName } from '@/config/categories'
 import { collectDatabaseStats, getDatabase } from '@/db/database'
+import { useNotificationPermission } from '@/hooks/useNotifications'
 import {
-  NOTIFICATION_HONEST_LIMITATION,
   NOTIFICATION_CATEGORY_LABELS,
+  notificationAllowedNotice,
   notificationChannelNotice,
-  notificationPermission,
+  notificationLimitation,
   requestNotificationPermission,
   sendTestNotification,
 } from '@/services/notifications/notifier'
@@ -85,7 +86,7 @@ export default function SettingsPage() {
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const permission = notificationPermission()
+  const permission = useNotificationPermission()
   const { saveSleepSchedule } = useApp()
 
   useEffect(() => {
@@ -630,7 +631,7 @@ export default function SettingsPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader
-                title="Browser notifications"
+                title="Notifications"
                 description="Permission, test and honest limitations"
                 icon={<BellRing />}
               />
@@ -654,7 +655,7 @@ export default function SettingsPage() {
                         await saveSettings({ notificationPermissionAsked: true })
                         setNotice(
                           result === 'granted'
-                            ? 'Notifications allowed. Reminders will pop up while the app is open.'
+                            ? notificationAllowedNotice()
                             : 'Notifications were not allowed. Reminders still appear inside the app.',
                         )
                       }}
@@ -669,7 +670,7 @@ export default function SettingsPage() {
                       onClick={async () => {
                         const channel = await sendTestNotification()
                         setNotice(
-                          channel === 'browser'
+                          channel === 'browser' || channel === 'native'
                             ? 'Test notification sent.'
                             : 'Test reminder added to the in-app notification centre.',
                         )
@@ -687,7 +688,7 @@ export default function SettingsPage() {
                 <div className="flex gap-2 rounded-2xl border border-[var(--color-warning)] bg-[var(--color-peach)]/40 p-3">
                   <ShieldAlert className="mt-0.5 size-4 shrink-0 text-[var(--color-peach-deep)]" />
                   <p className="text-[0.68rem] leading-relaxed text-[var(--color-peach-deep)]">
-                    {NOTIFICATION_HONEST_LIMITATION}
+                    {notificationLimitation()}
                   </p>
                 </div>
               </CardBody>

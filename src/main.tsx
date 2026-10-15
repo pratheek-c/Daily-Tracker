@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
+import { addNativeNotificationTapListener } from '@/services/notifications/native'
 import { AppProvider } from '@/app/AppContext'
 import { CloudProvider } from '@/app/CloudContext'
 import { router } from '@/app/router'
@@ -44,6 +45,18 @@ if (Capacitor.isNativePlatform()) {
       return
     }
     void CapacitorApp.exitApp()
+  })
+
+  // A reminder is only useful if tapping it opens the thing it is about.
+  const routeForRef: Record<string, string> = {
+    event: '/planner',
+    task: '/tasks',
+    habit: '/habits',
+    routine: '/sleep',
+    timer: '/study',
+  }
+  addNativeNotificationTapListener((tap) => {
+    void router.navigate((tap.refType && routeForRef[tap.refType]) || '/')
   })
 }
 

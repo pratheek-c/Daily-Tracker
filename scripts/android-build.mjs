@@ -57,7 +57,7 @@ const sdkRoot =
 if (!hasCommand('java', ['-version'])) {
   console.error(
     [
-      'No Java runtime found on PATH — the Android build needs a JDK (17 or newer).',
+      'No Java runtime found on PATH — the Android build needs a JDK 21 (Capacitor 8 targets it).',
       'Install Android Studio (which bundles one) or a JDK, then re-run.',
     ].join('\n'),
   )

@@ -3,8 +3,18 @@ import { addDaysToKey, todayKey, weekdayOf } from '@/lib/date'
 import { buildOccurrences, type Occurrence } from '@/services/scheduling/recurrence'
 import { newId } from '@/lib/utils'
 import { buildEventReminderJobs, buildHabitReminderJob, buildTaskReminderJob } from './reminders'
+import {
+  getNotificationPermission,
+  isNativeNotifications,
+  requestNotificationPermission as requestPermission,
+  type NotificationPermissionState,
+} from './permission'
+import { showNativeNotification } from './native'
 import type { TrackerData } from '@/hooks/useTrackerData'
 import type { NotificationCategory, NotificationJob, ScheduledEvent } from '@/types'
+
+/** Where a delivered reminder actually reached the user. */
+export type DeliveryChannel = 'browser' | 'native' | 'in-app'
 
 export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> = {
   study: 'Study sessions',
@@ -19,26 +29,30 @@ export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> 
 }
 
 export function notificationsSupported(): boolean {
-  return typeof window !== 'undefined' && 'Notification' in window
+  return isNativeNotifications() || (typeof window !== 'undefined' && 'Notification' in window)
 }
 
-export function notificationPermission(): NotificationPermission | 'unsupported' {
-  if (!notificationsSupported()) return 'unsupported'
-  return Notification.permission
+export function notificationPermission(): NotificationPermissionState {
+  return getNotificationPermission()
 }
 
-export async function requestNotificationPermission(): Promise<NotificationPermission | 'unsupported'> {
-  if (!notificationsSupported()) return 'unsupported'
-  try {
-    return await Notification.requestPermission()
-  } catch {
-    return 'denied'
-  }
+export async function requestNotificationPermission(): Promise<NotificationPermissionState> {
+  return requestPermission()
 }
 
 /** Deliver one notification, degrading to an in-app entry when blocked. */
-export function showNotification(job: NotificationJob): 'browser' | 'in-app' {
-  if (!notificationsSupported() || Notification.permission !== 'granted') return 'in-app'
+export async function showNotification(job: NotificationJob): Promise<DeliveryChannel> {
+  if (isNativeNotifications()) {
+    if (getNotificationPermission() !== 'granted') return 'in-app'
+    try {
+      await showNativeNotification(job)
+      return 'native'
+    } catch {
+      return 'in-app'
+    }
+  }
+
+  if (!('Notification' in window) || Notification.permission !== 'granted') return 'in-app'
   try {
     const notification = new Notification(job.title, {
       body: job.body,
@@ -183,7 +197,13 @@ export async function flushDueNotifications(): Promise<number> {
       await storage.deleteNotificationJob(job.id)
       continue
     }
-    const channel = showNotification(job)
+    // On native the OS already delivered this from the pre-scheduled local
+    // notification, so the flush only records it in the in-app history.
+    const channel: DeliveryChannel = isNativeNotifications()
+      ? getNotificationPermission() === 'granted'
+        ? 'native'
+        : 'in-app'
+      : await showNotification(job)
     const deliveredAt = Date.now()
     await storage.putNotificationLog({
       id: newId('notiflog'),
@@ -222,7 +242,7 @@ export async function pruneOrphanJobs(data: TrackerData): Promise<number> {
   return stale.length
 }
 
-export async function sendTestNotification(): Promise<'browser' | 'in-app' | 'unsupported'> {
+export async function sendTestNotification(): Promise<DeliveryChannel | 'unsupported'> {
   const permission = notificationPermission()
   if (permission === 'unsupported') return 'unsupported'
   const job: NotificationJob = {
@@ -246,6 +266,20 @@ export async function sendTestNotification(): Promise<'browser' | 'in-app' | 'un
 
 export function notificationChannelNotice(): string {
   const permission = notificationPermission()
+
+  if (isNativeNotifications()) {
+    if (permission === 'unsupported') {
+      return 'This device could not open a notification channel, so reminders appear in the in-app notification centre only.'
+    }
+    if (permission === 'denied') {
+      return 'Notifications are blocked for this app. Enable them in Android Settings → Apps → Anusree’s Daily Tracker → Notifications. Reminders still appear in the in-app notification centre.'
+    }
+    if (permission === 'default') {
+      return 'Allow notifications to get study, bedtime and wake-up nudges — they are scheduled on the device and arrive even when the app is closed.'
+    }
+    return 'Notifications are allowed. Reminders are scheduled with the device, so they arrive even when the app is closed.'
+  }
+
   if (permission === 'unsupported') {
     return 'This browser has no Notification API, so reminders appear in the in-app notification centre only.'
   }
@@ -258,5 +292,16 @@ export function notificationChannelNotice(): string {
   return 'Notifications are allowed. Reminders fire while the app is open in a tab; see the README for the closed-browser limitation.'
 }
 
-export const NOTIFICATION_HONEST_LIMITATION =
-  'Reminders are scheduled in the browser while this app is open. Neither browser timers nor a service worker can wake a closed browser at an exact minute, so a guaranteed alarm would need the optional server-side Web Push setup described in the README. This app is a planner, not a medical device or an alarm clock.'
+/** Copy shown right after permission is granted, which differs per platform. */
+export function notificationAllowedNotice(): string {
+  return isNativeNotifications()
+    ? 'Notifications allowed. Reminders are scheduled on the device and arrive even when the app is closed.'
+    : 'Notifications allowed. Reminders pop up while the app is open.'
+}
+
+export function notificationLimitation(): string {
+  if (isNativeNotifications()) {
+    return 'On Android your reminders are scheduled with the operating system, so they fire even when the app is closed. The soonest 60 are kept scheduled at a time; opening the app refreshes the list, so every reminder still arrives.'
+  }
+  return 'Reminders are scheduled in the browser while this app is open. Neither browser timers nor a service worker can wake a closed browser at an exact minute, so a guaranteed alarm would need the optional server-side Web Push setup described in the README. This app is a planner, not a medical device or an alarm clock.'
+}

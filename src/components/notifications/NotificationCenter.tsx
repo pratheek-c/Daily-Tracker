@@ -6,13 +6,14 @@ import { CuteEmptyState } from '@/components/ui/cute-empty-state'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ConfirmDialog, ConfirmDialogContent } from '@/components/ui/confirm-dialog'
 import { useApp } from '@/app/AppContext'
+import { useNotificationPermission } from '@/hooks/useNotifications'
 import { getStorage } from '@/services/persistence'
 import { formatClockFromMillis, relativeDayLabel, toDateKey } from '@/lib/date'
 import { cn } from '@/lib/utils'
 import {
   NOTIFICATION_CATEGORY_LABELS,
+  notificationAllowedNotice,
   notificationChannelNotice,
-  notificationPermission,
   requestNotificationPermission,
   sendTestNotification,
 } from '@/services/notifications/notifier'
@@ -25,7 +26,7 @@ export function NotificationCenter({ unread }: { unread: number }) {
   const [permissionNote, setPermissionNote] = useState<string | null>(null)
 
   const entries = data.notificationLog
-  const permission = notificationPermission()
+  const permission = useNotificationPermission()
 
   const grouped = useMemo(() => {
     const map = new Map<string, NotificationLogEntry[]>()
@@ -132,7 +133,7 @@ export function NotificationCenter({ unread }: { unread: number }) {
                   const result = await requestNotificationPermission()
                   setPermissionNote(
                     result === 'granted'
-                      ? 'Notifications allowed. Reminders will pop up while the app is open.'
+                      ? notificationAllowedNotice()
                       : 'Notifications remain blocked. Reminders will only appear here in the app.',
                   )
                 }}
@@ -147,8 +148,8 @@ export function NotificationCenter({ unread }: { unread: number }) {
                 onClick={async () => {
                   const channel = await sendTestNotification()
                   setPermissionNote(
-                    channel === 'browser'
-                      ? 'Test notification sent to your system tray.'
+                    channel === 'browser' || channel === 'native'
+                      ? 'Test notification sent to your device.'
                       : 'Test reminder added here — system notifications are not available right now.',
                   )
                 }}

@@ -504,8 +504,8 @@ export interface NotificationLogEntry {
   category: NotificationCategory
   fireAt: Millis
   deliveredAt: Millis
-  /** How the notification reached the user. */
-  channel: 'browser' | 'in-app' | 'skipped'
+  /** How the notification reached the user. `native` is a scheduled OS notification. */
+  channel: 'browser' | 'native' | 'in-app' | 'skipped'
   read: boolean
 }
 
