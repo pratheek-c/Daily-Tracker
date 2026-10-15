@@ -25,5 +25,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "middleware.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts", "middleware.ts", "capacitor.config.ts"]
 }

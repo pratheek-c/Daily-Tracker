@@ -26,6 +26,7 @@ statistics anywhere, including in the empty states.
 - [Notifications: what works and what does not](#notifications-what-works-and-what-does-not)
 - [Data storage, export and backup](#data-storage-export-and-backup)
 - [PWA and offline behaviour](#pwa-and-offline-behaviour)
+- [Android app](#android-app)
 - [Testing, linting and building](#testing-linting-and-building)
 - [Deployment](#deployment)
 - [Accessibility](#accessibility)
@@ -523,6 +524,59 @@ permanent unless you downloaded a backup.
   banner with a **Reload now** button.
 - Third-party font requests are deliberately not intercepted; the app degrades gracefully to system
   fonts.
+
+---
+
+## Android app
+
+The web app is also packaged as a native Android app with
+[Capacitor](https://capacitorjs.com). There is **one codebase**: `npm run build`
+produces `dist/`, and Capacitor copies that exact folder into the native project, so the
+web and Android builds cannot drift apart.
+
+```bash
+npm run build          # the web app (dist/)
+npm run android:build  # dist/ + cap sync + Gradle assembleDebug → an APK
+```
+
+| Script | What it does |
+| --- | --- |
+| `npm run cap:sync` | Build the web app and copy it into `android/` |
+| `npm run android:build` | Debug APK → `android/app/build/outputs/apk/debug/app-debug.apk` |
+| `npm run android:build:release` | Unsigned release APK |
+| `npm run android:bundle` | Play Store `.aab` |
+| `npm run android:open` | Open the project in Android Studio |
+| `npm run android:run` | Build, install and launch on a connected device |
+| `npm run android:assets` | Regenerate launcher icons and splash screens from the SVG artwork |
+
+### Prerequisites
+
+Gradle needs a **JDK 17 or newer** and the **Android SDK** — installing Android Studio
+gives you both. `npm run android:build` checks for them and prints what is missing rather
+than dumping raw Gradle output. Release builds also need a signing config (keystore) in
+`android/app/build.gradle` before the release APK is installable.
+
+The Android build is intentionally **not** part of the Vercel deploy: `.vercelignore`
+keeps `android/` out of the upload, and Vercel only ever runs `npm run build`.
+
+### How the native shell differs from the web app
+
+- **No edge middleware.** `middleware.ts` runs only on Vercel. Inside the WebView the
+  client-side gate in `AppShell` and, decisively, Row Level Security still protect data.
+- **No service worker.** The bundle already lives on the device, so
+  `registerServiceWorker` is skipped on native.
+- **Sessions still use cookies.** `androidScheme: 'https'` serves the app from
+  `https://localhost`, a real https origin, so `@supabase/ssr`'s cookies work in the WebView.
+- **Hardware back button** walks the router back to the dashboard before exiting.
+- **Email links do not deep-link into the app.** Password sign-in needs no email, so the
+  main flow works. A confirmation or password-reset *link* opens in a browser instead of the
+  app; wiring the custom URL scheme (`app.anusree.dailytracker://`) is the follow-up.
+
+### Icons and splash
+
+`npm run android:assets` rasterises `assets/icon-*.png` and `assets/splash*.png` — produced
+from the same SVG as the PWA icons by `npm run icons` — into
+`android/app/src/main/res`. Re-run it after changing the artwork.
 
 ---
 

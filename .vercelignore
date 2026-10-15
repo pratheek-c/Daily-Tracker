@@ -1,0 +1,7 @@
+# The native Android project is compiled with Gradle on a workstation, never by
+# Vercel. Excluding it keeps deployment uploads small and fast.
+android/
+# Local scratch space that has nothing to do with the deployed bundle.
+.sandbox/
+.tmp/
+.npm-cache/

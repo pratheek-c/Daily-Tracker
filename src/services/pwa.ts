@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { registerSW } from 'virtual:pwa-register'
 
 /**
@@ -7,6 +8,9 @@ import { registerSW } from 'virtual:pwa-register'
  * user is asked instead, which matters for a planner that may be open all day.
  */
 export function registerServiceWorker(onNeedRefresh: (reload: () => void) => void) {
+  // The native shell already ships the assets inside the app bundle, so a service
+  // worker would only add a second, redundant cache inside the WebView.
+  if (Capacitor.isNativePlatform()) return () => undefined
   if (!('serviceWorker' in navigator)) return () => undefined
   try {
     const update = registerSW({

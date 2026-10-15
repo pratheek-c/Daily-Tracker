@@ -133,3 +133,70 @@ const masterSvg = tileSvg(512, { inset: 0.05 }).replace(
 )
 writeFileSync(join(publicDir, 'favicon.svg'), masterSvg)
 console.log('wrote public/favicon.svg')
+
+/* -------------------------------------------------------------------------- */
+/* Capacitor (Android) sources                                                */
+/* -------------------------------------------------------------------------- */
+//
+// `@capacitor/assets` turns these into the Android launcher icons and splash
+// screens (`npm run android:assets`). Generating them from the same SVG means
+// the native icon can never drift from the PWA icon.
+
+const capacitorDir = join(here, '..', 'assets')
+mkdirSync(capacitorDir, { recursive: true })
+
+function gradientDefs() {
+  return `<defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${BLUSH}" />
+      <stop offset="100%" stop-color="${LAVENDER}" />
+    </linearGradient>
+  </defs>`
+}
+
+/** Transparent mark only, for Android's adaptive-icon foreground layer. */
+function foregroundSvg(size) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  <svg x="0" y="0" width="${size}" height="${size}" viewBox="0 0 100 100">
+    ${catMark({ scale: 0.62 })}
+  </svg>
+</svg>`
+}
+
+/** Solid gradient, for Android's adaptive-icon background layer. */
+function backgroundSvg(size) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  ${gradientDefs()}
+  <rect x="0" y="0" width="${size}" height="${size}" fill="url(#bg)" />
+</svg>`
+}
+
+/** Centred mark on the pastel gradient, cropped by the platform per density. */
+function splashSvg(size) {
+  const mark = Math.round(size * 0.34)
+  const offset = Math.round((size - mark) / 2)
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  ${gradientDefs()}
+  <rect x="0" y="0" width="${size}" height="${size}" fill="url(#bg)" />
+  <svg x="${offset}" y="${offset}" width="${mark}" height="${mark}" viewBox="0 0 100 100">
+    ${catMark({ scale: 0.92 })}
+  </svg>
+</svg>`
+}
+
+const capacitorTargets = [
+  { file: 'icon-only.png', size: 1024, svg: tileSvg(1024, { inset: 0.05 }) },
+  { file: 'icon-foreground.png', size: 1024, svg: foregroundSvg(1024) },
+  { file: 'icon-background.png', size: 1024, svg: backgroundSvg(1024) },
+  { file: 'splash.png', size: 2732, svg: splashSvg(2732) },
+  { file: 'splash-dark.png', size: 2732, svg: splashSvg(2732) },
+]
+
+for (const target of capacitorTargets) {
+  const png = await sharp(Buffer.from(target.svg), { density: 384 })
+    .resize(target.size, target.size)
+    .png({ compressionLevel: 9 })
+    .toBuffer()
+  writeFileSync(join(capacitorDir, target.file), png)
+  console.log(`wrote assets/${target.file} (${target.size}px, ${png.length} bytes)`)
+}
