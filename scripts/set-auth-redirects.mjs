@@ -16,45 +16,28 @@
  * This script therefore patches only `site_url` and `uri_allow_list` through the
  * Management API, and leaves everything else exactly as the dashboard has it.
  *
- * The token is read from the environment or `.env.local` and is never printed.
+ * The token is read from the environment or `~/.anusree-tracker-secrets.env`
+ * (see `scripts/env.mjs`) and is never printed.
  */
-import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
+import { loadProjectEnv } from './env.mjs'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
-
-function loadEnvFile(path) {
-  const out = {}
-  if (!existsSync(path)) return out
-  for (const rawLine of readFileSync(path, 'utf8').split(/\r?\n/)) {
-    const line = rawLine.trim()
-    if (!line || line.startsWith('#')) continue
-    const eq = line.indexOf('=')
-    if (eq === -1) continue
-    const key = line.slice(0, eq).trim()
-    let value = line.slice(eq + 1).trim()
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1)
-    }
-    out[key] = value
-  }
-  return out
-}
-
-const fileEnv = loadEnvFile(join(root, '.env.local'))
-const token = process.env.SUPABASE_ACCESS_TOKEN || fileEnv.SUPABASE_ACCESS_TOKEN
-const projectRef = process.env.SUPABASE_PROJECT_REF || fileEnv.SUPABASE_PROJECT_REF
+const env = loadProjectEnv(root)
+const token = env.SUPABASE_ACCESS_TOKEN
+const projectRef = env.SUPABASE_PROJECT_REF
 
 if (!token) {
-  console.error('No access token. Set SUPABASE_ACCESS_TOKEN or add it to .env.local.')
+  console.error(
+    'No access token. Set SUPABASE_ACCESS_TOKEN in ~/.anusree-tracker-secrets.env.',
+  )
   process.exit(2)
 }
 if (!projectRef) {
-  console.error('No project ref. Set SUPABASE_PROJECT_REF or add it to .env.local.')
+  console.error(
+    'No project ref. Set SUPABASE_PROJECT_REF in ~/.anusree-tracker-secrets.env.',
+  )
   process.exit(2)
 }
 

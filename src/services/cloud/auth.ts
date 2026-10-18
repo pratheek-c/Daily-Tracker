@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { getSupabase, isCloudConfigured } from './supabase'
+import { wipeLocalData } from './sync'
 
 export type AuthStatus = 'unconfigured' | 'loading' | 'signed-out' | 'signed-in'
 
@@ -408,23 +409,28 @@ export function useCloudAuth(): CloudAuthState {
     [client],
   )
 
-  const cancelRecovery = useCallback(async () => {
-    setRecovering(false)
-    if (!client) return
-    await client.auth.signOut()
-  }, [client])
-
   const signOut = useCallback(async () => {
     if (!client) return
     setError(null)
-    await client.auth.signOut()
-    setLinkSentTo(null)
-    setResetSentTo(null)
-    setRecovering(false)
-    // The PWA caches the app shell; drop it so a signed-out reload hits the edge
-    // middleware and is sent to /auth rather than served from the cache.
-    navigator.serviceWorker?.controller?.postMessage({ type: 'adt:clear-shell' })
+    try {
+      await client.auth.signOut()
+    } finally {
+      setLinkSentTo(null)
+      setResetSentTo(null)
+      setRecovering(false)
+      // The PWA caches the app shell; drop it so a signed-out reload hits the edge
+      // middleware and is sent to /auth rather than served from the cache.
+      navigator.serviceWorker?.controller?.postMessage({ type: 'adt:clear-shell' })
+      // The session is gone either way, so the shared local store must not keep
+      // this user's records around for the next account on this device.
+      void wipeLocalData()
+    }
   }, [client])
+
+  const cancelRecovery = useCallback(async () => {
+    setRecovering(false)
+    await signOut()
+  }, [signOut])
 
   const verifyEmailCode = useCallback(
     async (email: string, code: string) => {

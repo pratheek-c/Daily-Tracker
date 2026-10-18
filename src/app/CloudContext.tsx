@@ -13,8 +13,11 @@ import { isCloudConfigured, getSupabase } from '@/services/cloud/supabase'
 import {
   forgetSyncCursors,
   pushEverything,
+  readLastLocalUserId,
   runSync,
   wipeCloudData,
+  wipeLocalData,
+  writeLastLocalUserId,
   type SyncOutcome,
 } from '@/services/cloud/sync'
 
@@ -68,6 +71,8 @@ export function CloudProvider({ children }: { children: ReactNode }) {
   const inFlight = useRef(false)
   const uploadedFor = useRef<string | null>(null)
   const debounceHandle = useRef<number | null>(null)
+  /** Resolves once the local store is guaranteed clean of any previous account. */
+  const isolatedFor = useRef<Promise<void> | null>(null)
 
   const setAutoSync = useCallback((enabled: boolean) => {
     setAutoSyncState(enabled)
@@ -136,6 +141,8 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     if (!userId) {
       return { ok: false, pushed: 0, pulled: 0, conflicts: 0, error: 'Not signed in' }
     }
+    // Never touch the store before an in-flight account-switch wipe has finished.
+    await isolatedFor.current
     if (inFlight.current) {
       return { ok: true, pushed: 0, pulled: 0, conflicts: 0, error: null }
     }
@@ -158,6 +165,28 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     }
   }, [userId])
 
+  /* -- account isolation ----------------------------------------------------
+   * The local store is shared by every account on the device. When a different
+   * user signs in, the previous user's records must be removed before anything
+   * is read from (or pushed into) the store. This runs even with autoSync off,
+   * because the UI reads the store directly.
+   */
+  useEffect(() => {
+    if (!userId) {
+      isolatedFor.current = null
+      return
+    }
+    const previousUserId = readLastLocalUserId()
+    if (previousUserId !== null && previousUserId !== userId) {
+      // A different account on this device: wipe before anything is read or pushed.
+      // The mark is written only after the wipe so a crash mid-wipe re-wipes (harmless).
+      isolatedFor.current = wipeLocalData().finally(() => writeLastLocalUserId(userId))
+    } else {
+      if (previousUserId === null) writeLastLocalUserId(userId)
+      isolatedFor.current = null
+    }
+  }, [userId])
+
   /**
    * First sign-in on this device.
    *
@@ -171,6 +200,8 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     if (uploadedFor.current === userId) return
     uploadedFor.current = userId
     void (async () => {
+      // Wait for the account-switch wipe (if any) before reading or pushing.
+      await isolatedFor.current
       const { hasLocalUserData } = await import('@/db/database')
       const substantial = await hasLocalUserData()
       if (substantial) {
@@ -250,6 +281,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     if (!userId) {
       return { ok: false, pushed: 0, pulled: 0, conflicts: 0, error: 'Not signed in' }
     }
+    await isolatedFor.current
     setActivityPhase('syncing')
     try {
       const outcome = await pushEverything(userId)

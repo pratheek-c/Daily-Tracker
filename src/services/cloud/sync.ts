@@ -22,7 +22,7 @@
  * cursor because the trigger in `0001_records.sql` restamps `server_at`.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getDatabase, type ChangeLogRow, type TrackerDatabase } from '@/db/database'
+import { clearAllData, getDatabase, type ChangeLogRow, type TrackerDatabase } from '@/db/database'
 import {
   asRecordInserts,
   getSupabase,
@@ -467,6 +467,70 @@ export function forgetSyncCursors(userId: string) {
   } catch {
     // Ignored.
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Account isolation                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Remembers which account last used the local store on this device.
+ *
+ * The local store is shared by every account that signs in on the device, so
+ * this is how a sign-in can tell "the same user returning" (keep the data) from
+ * "a different account on a shared device" (wipe before anything is read or
+ * pushed).
+ */
+const LAST_USER_KEY = 'adt.auth.lastUserId'
+
+export function readLastLocalUserId(): string | null {
+  try {
+    return localStorage.getItem(LAST_USER_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function writeLastLocalUserId(userId: string): void {
+  try {
+    localStorage.setItem(LAST_USER_KEY, userId)
+  } catch {
+    // Ignored: worst case the next sign-in re-wipes an already-clean store.
+  }
+}
+
+/** Remove every pull cursor (all users), the change-log cursor and the last-user mark. */
+function clearAllCursors(): void {
+  try {
+    const stale: string[] = []
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i) ?? ''
+      if (key.startsWith(CURSOR_PREFIX)) stale.push(key)
+    }
+    for (const key of stale) localStorage.removeItem(key)
+    localStorage.removeItem(PUSH_HISTORY_KEY)
+    localStorage.removeItem(LAST_USER_KEY)
+  } catch {
+    // Ignored.
+  }
+}
+
+/**
+ * Remove all local data and sync state so the next account on this device
+ * starts from a clean store.
+ *
+ * Without this, a second account signing in on the same device would (a) see
+ * the first account's records in the UI and (b) have the first-sign-in upload
+ * push them into its own cloud rows. Called on sign-out and on account switch.
+ */
+export async function wipeLocalData(): Promise<void> {
+  try {
+    await clearAllData(getDatabase())
+  } catch {
+    // Best effort: a storage failure leaves the device in the same state the
+    // app already tolerates for any local-only failure.
+  }
+  clearAllCursors()
 }
 
 export { LOCAL_ONLY_TABLES }

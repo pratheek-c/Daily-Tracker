@@ -218,7 +218,14 @@ chosen because it sends no email and therefore dodges the hosted mailer's tiny h
    VITE_SUPABASE_ANON_KEY=<anon or publishable key>
    ```
 
-   Add the same two to your Vercel project (*Settings → Environment Variables*) and redeploy.
+   These are the only values that belong in `.env.local`: `VITE_`-prefixed
+   values are compiled into the browser bundle, and the project folder is
+   OneDrive-synced. Server-side credentials (service-role key, Postgres
+   password, Personal Access Token) go in `~/.anusree-tracker-secrets.env`
+   instead — see the template in `.env.example`; the scripts read both files
+   via `scripts/env.mjs`.
+
+   Add the same two `VITE_` values to your Vercel project (*Settings → Environment Variables*) and redeploy.
 
 5. **Configure email auth (this is the fix for “email rate limit exceeded”).** The app signs in with
    **email and password**, which sends no email. Supabase's built-in mailer, by contrast, allows only
@@ -262,8 +269,9 @@ chosen because it sends no email and therefore dodges the hosted mailer's tiny h
 
 `supabase:auth:set` needs a **Personal Access Token** (<https://supabase.com/dashboard/account/tokens>),
 because auth configuration is Management API data that a Postgres password cannot reach. Database-only
-commands (`db push`, `db reset`) need only `SUPABASE_DB_URL`. Put the token in `.env.local` as
-`SUPABASE_ACCESS_TOKEN` and revoke it once setup is done — the configuration it writes persists.
+commands (`db push`, `db reset`) need only `SUPABASE_DB_URL`. Put the token in
+`~/.anusree-tracker-secrets.env` as `SUPABASE_ACCESS_TOKEN` (the scripts read it via
+`scripts/env.mjs`) and revoke it once setup is done — the configuration it writes persists.
 
 The scripts route through `scripts/run-supabase.mjs`, which invokes the bundled Go binary directly
 with `HOME` redirected inside the project. The stock `npx supabase` launcher is Bun-compiled and

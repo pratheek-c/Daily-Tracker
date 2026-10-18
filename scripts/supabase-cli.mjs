@@ -1,7 +1,8 @@
 /**
  * Convenience wrapper around the Supabase CLI for this project.
  *
- * It loads `.env.local` (which npm does not do for plain scripts), maps the
+ * It loads the project's `.env.local` plus `~/.anusree-tracker-secrets.env`
+ * (which npm does not do for plain scripts) via `scripts/env.mjs`, maps the
  * project's variable names onto the ones the CLI expects, then delegates to
  * `run-supabase.mjs`.
  *
@@ -11,43 +12,20 @@
  *   node scripts/supabase-cli.mjs db reset
  *   node scripts/supabase-cli.mjs <anything the CLI accepts>
  *
- * `.env.local` is gitignored and holds the only credentials the CLI needs:
+ * `.env.local` is gitignored and holds the publishable `VITE_*` values; the
+ * credentials the CLI needs live in `~/.anusree-tracker-secrets.env` (outside
+ * the synced project folder). Both are read via `scripts/env.mjs`:
  *   SUPABASE_DB_URL        direct Postgres URL, used by `db push` / `db reset`
  *   SUPABASE_ACCESS_TOKEN  optional Personal Access Token, needed only for
  *                          Management API commands such as `config push`
  */
-import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { loadProjectEnv } from './env.mjs'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
-const envPath = join(root, '.env.local')
-
-/** Minimal dotenv reader: `KEY=value`, optional surrounding quotes, `#` comments. */
-function loadEnvFile(path) {
-  const out = {}
-  if (!existsSync(path)) return out
-  for (const rawLine of readFileSync(path, 'utf8').split(/\r?\n/)) {
-    const line = rawLine.trim()
-    if (!line || line.startsWith('#')) continue
-    const eq = line.indexOf('=')
-    if (eq === -1) continue
-    const key = line.slice(0, eq).trim()
-    let value = line.slice(eq + 1).trim()
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1)
-    }
-    out[key] = value
-  }
-  return out
-}
-
-const fileEnv = loadEnvFile(envPath)
-const env = { ...process.env, ...fileEnv }
+const env = loadProjectEnv(root)
 
 const args = process.argv.slice(2)
 if (args.length === 0) {
@@ -65,8 +43,9 @@ if (subcommand.startsWith('db push') || subcommand.startsWith('db reset') || sub
   if (!forwarded.includes('--db-url')) {
     if (!env.SUPABASE_DB_URL) {
       console.error(
-        'SUPABASE_DB_URL is missing from .env.local.\n' +
-          'Add it as: postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres',
+        'SUPABASE_DB_URL is missing.\n' +
+          'Add it to ~/.anusree-tracker-secrets.env (see scripts/env.mjs) as:\n' +
+          '  postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres',
       )
       process.exit(2)
     }

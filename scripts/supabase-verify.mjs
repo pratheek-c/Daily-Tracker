@@ -2,43 +2,22 @@
  * Convenience wrapper for the Supabase verification scripts.
  *
  * npm scripts run through cmd.exe, which does not expand `$VAR`, so the values
- * have to be read from `.env.local` here instead.
+ * have to be read from the env files here instead (`scripts/env.mjs`): the
+ * project's `.env.local` for the publishable `VITE_*` values and
+ * `~/.anusree-tracker-secrets.env` for the service-role key.
  *
  * Usage:
  *   node scripts/supabase-verify.mjs schema
  *   node scripts/supabase-verify.mjs auth
  *   node scripts/supabase-verify.mjs password
  */
-import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { loadProjectEnv } from './env.mjs'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
-const envPath = join(root, '.env.local')
-
-function loadEnvFile(path) {
-  const out = {}
-  if (!existsSync(path)) return out
-  for (const rawLine of readFileSync(path, 'utf8').split(/\r?\n/)) {
-    const line = rawLine.trim()
-    if (!line || line.startsWith('#')) continue
-    const eq = line.indexOf('=')
-    if (eq === -1) continue
-    const key = line.slice(0, eq).trim()
-    let value = line.slice(eq + 1).trim()
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1)
-    }
-    out[key] = value
-  }
-  return out
-}
-
-const env = { ...process.env, ...loadEnvFile(envPath) }
+const env = loadProjectEnv(root)
 const url = env.VITE_SUPABASE_URL
 const publishable = env.VITE_SUPABASE_ANON_KEY
 const secret = env.SUPABASE_SECRET_KEY
@@ -69,7 +48,8 @@ if (!target) {
 if (target.args.some((value) => !value)) {
   console.error(
     `Missing credentials for the "${which}" check. ` +
-      'Expected VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and SUPABASE_SECRET_KEY in .env.local.',
+      'Expected VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and SUPABASE_SECRET_KEY. ' +
+        'The first two live in .env.local, the last in ~/.anusree-tracker-secrets.env.',
   )
   process.exit(2)
 }
