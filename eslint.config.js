@@ -5,7 +5,22 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'dev-dist', 'node_modules', '.npm-cache', 'coverage', '.tmp'] },
+  {
+    // `android/app/build` holds Gradle's generated output (including a vendored
+    // `native-bridge.js` that is not ours to lint); it is gitignored but ESLint
+    // does not read .gitignore.
+    ignores: [
+      'dist',
+      'dev-dist',
+      'node_modules',
+      '.npm-cache',
+      'coverage',
+      '.tmp',
+      'android/app/build',
+      'android/build',
+      'android/.gradle',
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

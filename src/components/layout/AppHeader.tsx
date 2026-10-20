@@ -112,8 +112,15 @@ export function AppHeader({ onOpenMobileNav, unreadNotifications }: AppHeaderPro
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--surface)]/92 backdrop-blur-md">
-      <div className="flex items-center gap-2 px-3 py-2.5 sm:px-4 lg:px-6">
+    <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--surface)]">
+      {/*
+        The padding-top carries the status-bar inset, so the header's own
+        background sits behind the clock and the greeting never collides with
+        it. The blur is a desktop nicety only: `backdrop-filter` is one of the
+        most expensive things a WebView can do while scrolling, and on Android
+        the header sits over a scrolling list, so mobile gets a solid surface.
+      */}
+      <div className="flex items-center gap-2 py-2.5 pl-[calc(0.75rem+var(--safe-left))] pr-[calc(0.75rem+var(--safe-right))] pt-[calc(0.625rem+var(--safe-top))] sm:pl-[calc(1rem+var(--safe-left))] sm:pr-[calc(1rem+var(--safe-right))] lg:pl-[calc(1.5rem+var(--safe-left))] lg:pr-[calc(1.5rem+var(--safe-right))] lg:bg-[var(--surface)]/92 lg:backdrop-blur-md">
         <Button
           variant="ghost"
           size="icon"

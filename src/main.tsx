@@ -4,6 +4,7 @@ import { RouterProvider } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { addNativeNotificationTapListener } from '@/services/notifications/native'
+import { runBackHandler } from '@/services/native/back-button'
 import { AppProvider } from '@/app/AppContext'
 import { CloudProvider } from '@/app/CloudContext'
 import { router } from '@/app/router'
@@ -36,6 +37,9 @@ createRoot(container).render(
 // Without this listener Capacitor exits on the first press from any screen.
 if (Capacitor.isNativePlatform()) {
   void CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+    // An open dialog or menu claims the press first, the way it would on the
+    // web with the Escape key.
+    if (runBackHandler()) return
     if (canGoBack) {
       void router.navigate(-1)
       return

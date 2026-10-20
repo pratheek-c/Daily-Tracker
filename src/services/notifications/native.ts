@@ -109,11 +109,25 @@ export async function syncNativeReminders(
 
   try {
     const pending = await LocalNotifications.getPending()
+
+    // Only *touch* the alarms that actually changed. Re-scheduling all of them
+    // on every change (a habit ticked, a title edited) would churn through the
+    // OS alarm queue for no reason, which costs battery and, on some devices,
+    // resets the exactness of alarms that were already set.
+    const pendingById = new Map(pending.notifications.map((notification) => [notification.id, notification]))
+
     const stale = pending.notifications
       .filter((notification) => !wantedIds.has(notification.id))
       .map((notification) => ({ id: notification.id }))
     if (stale.length > 0) await LocalNotifications.cancel({ notifications: stale })
-    if (wanted.length > 0) await LocalNotifications.schedule({ notifications: wanted })
+
+    const changed = wanted.filter((notification) => {
+      const existing = pendingById.get(notification.id)
+      if (!existing) return true
+      const existingAt = existing.schedule?.at ? new Date(existing.schedule.at).getTime() : 0
+      return existingAt !== new Date(notification.schedule?.at ?? 0).getTime()
+    })
+    if (changed.length > 0) await LocalNotifications.schedule({ notifications: changed })
   } catch {
     return 0
   }

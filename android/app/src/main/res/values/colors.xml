@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The app's own palette, so the native chrome (status bar, splash) matches
+        the web shell instead of showing Capacitor's default indigo.
+    -->
+    <color name="appSurface">#FFFAFC</color>
+    <color name="appAccent">#F2A7C3</color>
+    <color name="appAccentDark">#B95F86</color>
+</resources>

@@ -1,6 +1,35 @@
 apply plugin: 'com.android.application'
 
+/*
+ * The packaged web assets are staged OUTSIDE the project folder.
+ *
+ * A checkout inside a cloud-synced folder (OneDrive, Dropbox) breaks the
+ * Android build: the sync client turns the copied assets into reparse-point
+ * placeholders, and Gradle refuses to snapshot a file that is not a regular
+ * file — "Cannot snapshot …: not a regular file". Reading the file hydrates it
+ * but does not clear the attribute, so the only reliable fix is to build from
+ * plain local files.
+ *
+ * `scripts/android-build.mjs` populates this directory before Gradle runs, and
+ * `android/build.gradle` puts the intermediates somewhere local for the same
+ * reason. Override the location with the `ANDROID_WEB_ASSETS` environment
+ * variable.
+ */
+def stagingPath = System.getenv('ANDROID_WEB_ASSETS')
+if (!stagingPath) {
+    stagingPath = new File(
+        System.getProperty('user.home'),
+        '.anusree-tracker-android-assets'
+    ).absolutePath
+}
+
 android {
+    sourceSets {
+        main {
+            assets.srcDirs = [new File(stagingPath)]
+        }
+    }
+
     namespace = "app.anusree.dailytracker"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {

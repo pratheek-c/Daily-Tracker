@@ -216,9 +216,39 @@
     border-color: var(--line);
   }
 
+  /*
+   * Safe-area insets.
+   *
+   * Three sources have to be supported:
+   *   - Capacitor on Android injects `--safe-area-inset-*` on the root element
+   *     (see the SystemBars plugin, `insetsHandling: "css"`), because a WebView
+   *     cannot be relied on to report `env()` values;
+   *   - iOS Safari and installed PWAs report `env(safe-area-inset-*)`;
+   *   - a plain browser reports neither, so the fallback is zero.
+   *
+   * The tokens below collapse all three into one set of names the UI can use.
+   */
+  :root {
+    --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+    --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+    --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+    --safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
-    scroll-behavior: smooth;
+    /*
+     * Deliberately NOT `scroll-behavior: smooth`. The app has no in-page anchor
+     * links, and a global smooth scroll makes route changes and the browser's own
+     * back-navigation scroll *animate* on Android WebView, which reads as lag
+     * rather than polish. Smooth scrolling is opt-in per element instead.
+     */
+    scroll-behavior: auto;
+    /*
+     * The header is sticky, so anything scrolled into view by a browser-driven
+     * scroll (focus, find-in-page, fragment) would land under it.
+     */
+    scroll-padding-top: calc(4rem + var(--safe-top));
   }
 
   body {
@@ -230,7 +260,13 @@
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /*
+     * Stops the pull-to-refresh glow and the scroll chaining into the page
+     * behind, both of which look broken in a full-screen app.
+     */
     overscroll-behavior-y: none;
+    /* Text selection on buttons and tabs is never wanted and looks broken. */
+    -webkit-tap-highlight-color: transparent;
   }
 
   h1,
@@ -280,6 +316,22 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--accent);
     background-clip: content-box;
+  }
+
+  /*
+   * Android draws a styled scrollbar *permanently* and it eats into the
+   * content width, which makes a dense table feel cramped and adds a permanent
+   * repaint while scrolling. On touch devices the scrollbar is invisible
+   * anyway, so it is hidden and the space is given back to the content.
+   */
+  @media (pointer: coarse) {
+    ::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: transparent;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {

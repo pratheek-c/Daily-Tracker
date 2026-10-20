@@ -18,7 +18,16 @@
  *      supports (17–24), even when no JDK 21 is installed.
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -193,6 +202,28 @@ run('npm', ['run', 'build'], { env: gradleEnv })
 console.log('\n› syncing dist/ into the Android project')
 run('npx', ['cap', 'sync', 'android'], { env: gradleEnv })
 
+/*
+ * Stage the packaged web assets on plain local disk.
+ *
+ * `cap copy` writes them into `android/app/src/main/assets/public`, which — in
+ * a cloud-synced checkout — becomes a set of reparse-point placeholders that
+ * Gradle refuses to snapshot. The app module reads its assets from this
+ * staging directory instead, so the build always sees regular files. The
+ * content is identical: `dist/` is the source of truth and the Capacitor
+ * config files are copied verbatim.
+ */
+const stagingDir = process.env.ANDROID_WEB_ASSETS || join(homedir(), '.anusree-tracker-android-assets')
+const stagedPublic = join(stagingDir, 'public')
+rmSync(stagedPublic, { recursive: true, force: true })
+mkdirSync(stagedPublic, { recursive: true })
+cpSync(join(root, 'dist'), stagedPublic, { recursive: true })
+
+for (const name of ['capacitor.config.json', 'capacitor.plugins.json']) {
+  const from = join(root, 'android', 'app', 'src', 'main', 'assets', name)
+  if (existsSync(from)) copyFileSync(from, join(stagingDir, name))
+}
+console.log(`  staged web assets in ${stagingDir}`)
+
 /**
  * Drop the empty `.gitkeep` placeholders inside the generated Cordova plugins
  * folder. When the project lives under OneDrive they can become cloud-only
@@ -221,12 +252,45 @@ console.log(`\n› gradle ${gradleTask}`)
 const wrapper = isWindows ? 'gradlew.bat' : './gradlew'
 run(wrapper, [gradleTask], { cwd: join(root, 'android'), env: gradleEnv })
 
-const artifact =
-  mode === 'release'
-    ? join('android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release-unsigned.apk')
-    : mode === 'bundle'
-      ? join('android', 'app', 'build', 'outputs', 'bundle', 'release', 'app-release.aab')
-      : join('android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk')
+/*
+ * Gradle writes its output outside the project (see android/build.gradle), so
+ * the artifact is copied back to the conventional path inside `android/`. That
+ * keeps the documented location stable while the intermediates stay on a plain
+ * local disk, where a cloud-synced folder cannot lock them.
+ */
+const buildRoot = process.env.ANDROID_BUILD_DIR || join(homedir(), '.anusree-tracker-android-build')
 
-console.log(`\n✓ done — ${artifact}`)
-console.log(`  Install on a connected device with: adb install -r ${artifact}`)
+const artifactName =
+  mode === 'release'
+    ? 'app-release-unsigned.apk'
+    : mode === 'bundle'
+      ? 'app-release.aab'
+      : 'app-debug.apk'
+
+const artifactDir =
+  mode === 'release'
+    ? join(buildRoot, 'app', 'outputs', 'apk', 'release')
+    : mode === 'bundle'
+      ? join(buildRoot, 'app', 'outputs', 'bundle', 'release')
+      : join(buildRoot, 'app', 'outputs', 'apk', 'debug')
+
+const source = join(artifactDir, artifactName)
+if (!existsSync(source)) {
+  console.error(`\nGradle finished but ${source} was not produced.`)
+  process.exit(1)
+}
+
+const destination = join(
+  root,
+  'android',
+  'app',
+  'build',
+  'outputs',
+  mode === 'bundle' ? join('bundle', 'release') : join('apk', mode),
+  artifactName,
+)
+mkdirSync(dirname(destination), { recursive: true })
+copyFileSync(source, destination)
+
+console.log(`\n✓ done — ${destination}`)
+console.log(`  Install on a connected device with: adb install -r ${destination}`)

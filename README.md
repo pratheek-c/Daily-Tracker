@@ -329,8 +329,8 @@ writes to `~/.supabase`, which fails in a restricted or sandboxed environment.
 | **What is synced** | 16 entity types (settings, subjects, projects, project tasks, tasks, events, activity records, study sessions, habits, habit entries, sleep schedule, sleep exceptions, sleep sessions, sleep routines, routine completions, timer state markers). |
 | **What is *not* synced** | Notification jobs and the change log are derived local state and are rebuilt from records. Running timers are deliberately device-local: two devices must never fight over one stopwatch. |
 | **Push** | The append-only `changeLog` is collapsed to the newest row per record and upserted in batches of 400, so a push is proportional to what actually changed. |
-| **Pull** | Incremental by a server-stamped `server_at` cursor, 1000 rows at a time. |
-| **Conflicts** | Last-write-wins **per record**, keyed on each record's own `updatedAt`. |
+| **Pull** | Incremental by a server-stamped `server_at` cursor, 1000 rows at a time. The cursor advances past rows this build does not recognise, so an unknown entity can never stall the pull. |
+| **Conflicts** | Last-write-wins **per record**, keyed on each record's own `updatedAt`. The rule is applied symmetrically: a pull only accepts a remote row that is *strictly* newer, and a push only writes a local record when the remote is not newer — so a push can never clobber a more recent edit made on another device. |
 | **Deletes** | Soft tombstones, so deleting on one device is not resurrected by a stale copy on another. |
 | **Triggers** | Sync runs on first sign-in, on a 2.5 s debounce after any local mutation, on tab focus, on visibility change, on reconnect, every 5 minutes as a safety net, and on demand from the header indicator. |
 | **Offline** | Every remote call is skipped while offline and the queued work is pushed on reconnect. |
@@ -463,6 +463,8 @@ bedtime, and before noon the current night is still considered yesterday's.
 - **Reminders are recalculated on reload and on app resume** (`visibilitychange` and `focus`).
 - Permission denial is handled gracefully: everything still lands in the in-app centre, and the UI
   says so plainly.
+- Only the alarms that actually **changed** are re-scheduled with the OS, so editing one record does
+  not churn through the whole alarm queue.
 
 ### The honest limitation
 
@@ -621,18 +623,33 @@ release APK is installable.
 
 ### Local build troubleshooting
 
+The Android build is written to survive a checkout inside a **cloud-synced folder** (OneDrive,
+Dropbox), which is where most of the confusing failures come from. Two things are moved onto plain
+local disk for that reason:
+
+| What | Where it goes | Why |
+| --- | --- | --- |
+| Gradle intermediates | `%USERPROFILE%\.anusree-tracker-android-build` | the sync client locks files the build is writing, which surfaces as `AccessDeniedException` on the resource merger |
+| The packaged web assets | `%USERPROFILE%\.anusree-tracker-android-assets` | the copied assets become reparse-point placeholders, and Gradle refuses to snapshot a file that is not a regular file |
+
+Both locations can be overridden with `ANDROID_BUILD_DIR` and `ANDROID_WEB_ASSETS`. The finished
+APK is copied back to the conventional path inside the project, so
+`android/app/build/outputs/apk/debug/app-debug.apk` is always the file to install.
+
+Remaining failure modes:
+
 - **“Cannot find a Java installation … languageVersion=21”** — Gradle could not obtain the toolchain.
   Check that `org.gradle.java.installations.auto-download=true` is still in `android/gradle.properties`
   and that the build has network access to the Gradle Plugin Portal on first run.
-- **“Cannot snapshot … .gitkeep: not a regular file”** — the project is inside OneDrive, which turned
-  the generated plugins folder's `.gitkeep` files into cloud-only reparse points. `npm run android:build`
-  deletes them after each `cap sync`; if you build from Android Studio instead, delete them by hand.
+- **“Cannot snapshot … .gitkeep: not a regular file”** — the generated Cordova plugins folder still
+  contains OneDrive placeholders. `npm run android:build` deletes them after each `cap sync`; if you
+  build from Android Studio instead, delete them by hand.
 - **“Could not move temporary workspace … to immutable location”** — a stale Gradle cache entry, usually
   from an interrupted build or antivirus locking. Stop the daemons and retry:
   `cd android && gradlew --stop`.
 
-The safest long-term fix for the last two is to keep the checkout somewhere outside a
-cloud-synced folder (OneDrive/Dropbox), which also makes Gradle's file watching far more reliable.
+Building from a folder that is *not* cloud-synced is still the most comfortable option: it also
+makes Gradle's file watching reliable, so incremental builds are much faster.
 
 The Android build is intentionally **not** part of the Vercel deploy: `.vercelignore`
 keeps `android/` out of the upload, and Vercel only ever runs `npm run build`.
@@ -648,10 +665,33 @@ keeps `android/` out of the upload, and Vercel only ever runs `npm run build`.
   links to the relevant screen. See [Notifications](#notifications-what-works-and-what-does-not).
 - **Sessions still use cookies.** `androidScheme: 'https'` serves the app from
   `https://localhost`, a real https origin, so `@supabase/ssr`'s cookies work in the WebView.
-- **Hardware back button** walks the router back to the dashboard before exiting.
+- **The hardware back button** closes the topmost dialog or menu first (the same code path as
+  `Escape`), then walks the router back, and only exits from the dashboard. Without the first step
+  a back press would navigate the app *behind* an open dialog, which reads as the app ignoring you.
 - **Email links do not deep-link into the app.** Password sign-in needs no email, so the
   main flow works. A confirmation or password-reset *link* opens in a browser instead of the
   app; wiring the custom URL scheme (`app.anusree.dailytracker://`) is the follow-up.
+
+### Not overlapping the system bars
+
+Android 15+ (API 35) draws apps **edge to edge**, so the WebView extends behind the status bar
+and the gesture bar. Capacitor's built-in `SystemBars` plugin measures those insets and injects
+them as `--safe-area-inset-*` custom properties on the root element; `src/styles/index.css` turns
+them into four tokens that the layout uses:
+
+| Token | Source | Used by |
+| --- | --- | --- |
+| `--safe-top` | `--safe-area-inset-top`, else `env(safe-area-inset-top)`, else `0` | header, sidebar drawer, auth and boot screens |
+| `--safe-bottom` | the same, for the bottom | mobile tab bar, floating button, page padding |
+| `--safe-left` / `--safe-right` | the same, for the sides | header, page and drawer, for cutouts in landscape |
+
+The fallback chain matters: a WebView cannot be relied on to report `env()` values, iOS Safari
+reports `env()` but not the custom properties, and a plain browser reports neither. Every value
+degrades to `0`, so the desktop layout is untouched.
+
+The native theme also paints the system bars in the app's own surface colour
+(`android/app/src/main/res/values/colors.xml`) so they blend into the header instead of showing a
+grey band on Android 14 and below.
 
 ### Icons and splash
 
@@ -666,7 +706,7 @@ from the same SVG as the PWA icons by `npm run icons` — into
 ```bash
 npm run typecheck   # tsc -b, no emit
 npm run lint        # ESLint (0 errors expected)
-npm test            # 56 unit tests
+npm test            # 71 unit tests
 npm run build       # typecheck + production build into dist/
 ```
 
@@ -685,6 +725,10 @@ unknown, and never returning a negative estimate).
 `src/services/analytics/selectors.test.ts` — habit streaks that skip unscheduled days, "today is
 still open" behaviour, best-streak runs after a gap, 28-day consistency, weighted checklist and
 project progress, routine completion, and day rollups.
+
+`src/services/cloud/merge-rules.test.ts` — the last-write-wins rules: the remote only wins when it
+is strictly newer, a push refuses to overwrite a newer remote copy, records that share an id
+across two entities never collide, and the pull cursor only ever moves forward.
 
 ### Manual smoke test
 
@@ -782,6 +826,27 @@ immutably. `npm run serve:dist` demonstrates a correct minimal setup for local v
 
 ---
 
+## Scrolling and motion
+
+The app is used one-handed on a phone far more often than on a desktop, so scrolling is treated as
+a first-class concern rather than a browser default:
+
+- **The sticky header and the bottom tab bar are solid on mobile.** `backdrop-filter` is one of the
+  most expensive things a WebView can do while scrolling, and on Android both bars sit over a moving
+  list, so the blur is a desktop-only refinement.
+- **Scrollbars are hidden on touch devices.** Android draws a styled scrollbar *permanently* and it
+  eats into the content width, which makes a dense table feel cramped; the space goes back to the
+  content instead.
+- **Pull-to-refresh is disabled** (`overscroll-behavior-y: none`), so the app never shows a browser
+  refresh spinner over a planner.
+- **A new page starts at the top.** Moving from a long list to a short page used to leave you
+  stranded half-way down, because the document kept its previous scroll offset. Back and forward
+  navigation is deliberately left alone, because there the browser restores the old position.
+- **Smooth scrolling is opt-in, not global.** `scroll-behavior: smooth` on the root element made
+  route changes and the browser's own back-navigation scroll *animate* in the WebView, which reads
+  as lag rather than polish. The app has no in-page anchor links, so nothing is lost.
+- **Animations respect `prefers-reduced-motion`**, which is honoured by the OS and by the WebView.
+
 ## Extending storage and sync
 
 The app already has two swappable seams.
@@ -812,6 +877,10 @@ It drains `changeLog` (newest snapshot per record), upserts into the RLS-protect
 and pulls incrementally by a server-stamped cursor. To point at a different backend, replace that
 module; to change what is synced, adjust the entity map and the migration in `supabase/`. Records
 carry stable uuid `id`s and `updatedAt` stamps so last-write-wins merging works across devices.
+
+The merge rules themselves live in `src/services/cloud/merge-rules.ts` as pure functions, with
+tests in `merge-rules.test.ts`. They are the easiest part of the engine to get subtly wrong, so
+they are kept free of any database or network dependency.
 
 Automatically waking a **closed browser** on the web remains the one open extension. The Android app
 schedules reminders locally with the OS; the browser build would need the [Web Push](#optional-server-side-web-push-not-implemented)

@@ -53,14 +53,14 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: AppSidebarProps) {
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-[var(--line)] bg-[var(--surface)] transition-[transform,width] duration-300 ease-out',
+          'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-[var(--line)] bg-[var(--surface)] pl-[var(--safe-left)] transition-[transform,width] duration-300 ease-out',
           collapsed ? 'lg:w-[76px]' : 'lg:w-[264px]',
           'w-[272px] lg:translate-x-0',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         )}
         aria-label="Main navigation"
       >
-        <div className="flex items-center gap-2.5 px-4 py-4">
+        <div className="flex items-center gap-2.5 px-4 pt-[calc(1rem+var(--safe-top))] pb-4">
           <Logo className="size-9" />
           {!collapsed ? (
             <div className="min-w-0 flex-1">
@@ -93,7 +93,7 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: AppSidebarProps) {
           </Button>
         </div>
 
-        <nav className="scrollbar-none min-h-0 flex-1 overflow-y-auto px-2.5 pb-2">
+        <nav className="scrollbar-none min-h-0 flex-1 overflow-y-auto px-2.5 pb-[calc(0.5rem+var(--safe-bottom))]">
           {NAV_SECTIONS.map((section) => (
             <div key={section.title} className="mb-3">
               {!collapsed ? (

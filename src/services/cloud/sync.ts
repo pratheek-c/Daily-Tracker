@@ -30,6 +30,13 @@ import {
   type RemoteRecord,
   type RemoteRecordInsert,
 } from './supabase'
+import {
+  advanceCursor,
+  partitionPushable,
+  recordKey,
+  remoteWins,
+  type PushableRecord,
+} from './merge-rules'
 
 /** The insert payload type, so upserts are checked against the real column set. */
 type RecordInsert = RemoteRecordInsert
@@ -189,7 +196,16 @@ async function pushPending(
   let pushed = 0
   for (let index = 0; index < pending.length; index += batchSize) {
     const batch = pending.slice(index, index + batchSize)
-    const payload: RecordInsert[] = batch.map((record) => ({
+
+    // Never overwrite a newer remote row. The pull side already applies
+    // last-write-wins, so an unconditional upsert here would make the merge
+    // asymmetric and could silently destroy a newer edit made on another
+    // device (or one that arrived while this device was offline).
+    const remoteVersions = await readRemoteVersions(client, userId, batch)
+    const { pushable } = partitionPushable(batch, remoteVersions)
+    if (pushable.length === 0) continue
+
+    const payload: RecordInsert[] = pushable.map((record) => ({
       user_id: userId,
       entity: record.entity,
       id: record.id,
@@ -203,12 +219,56 @@ async function pushPending(
       .from('records')
       .upsert(asRecordInserts(payload), { onConflict: 'user_id,entity,id', ignoreDuplicates: false })
     if (error) throw new Error(`Push failed: ${error.message}`)
-    pushed += batch.length
+    pushed += payload.length
   }
 
   // Only advance the cursor after a successful write, so a failed push retries.
   writeChangeLogCursor(highWaterSeq)
   return { pushed, highWaterSeq }
+}
+
+function recordKeyOf(record: { entity: string; id: string }): string {
+  return recordKey(record.entity, record.id)
+}
+
+/**
+ * Read the remote `updated_at` for every record in a batch.
+ *
+ * The remote is queried once per batch and the answer is reduced to a map of
+ * `entity:id` keys, so the push stays a single round trip per batch rather
+ * than one per record.
+ */
+async function readRemoteVersions(
+  client: SupabaseClient<Database>,
+  userId: string,
+  batch: PushableRecord[],
+): Promise<Map<string, number>> {
+  const versions = new Map<string, number>()
+  if (batch.length === 0) return versions
+
+  const entities = [...new Set(batch.map((record) => record.entity))]
+  const ids = [...new Set(batch.map((record) => record.id))]
+
+  try {
+    const { data, error } = await client
+      .from('records')
+      .select('entity,id,updated_at')
+      .eq('user_id', userId)
+      .in('entity', entities)
+      .in('id', ids)
+    if (error || !data) return versions
+
+    const localByKey = new Map(batch.map((record) => [recordKeyOf(record), record]))
+    for (const row of data as { entity: string; id: string; updated_at: number }[]) {
+      const key = `${row.entity}:${row.id}`
+      if (!localByKey.has(key)) continue
+      versions.set(key, Number(row.updated_at))
+    }
+  } catch {
+    // If the guard cannot be evaluated, push as before rather than stalling
+    // the sync: the pull side will still reconcile on the next cycle.
+  }
+  return versions
 }
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -276,13 +336,23 @@ async function pullChanges(
 
   await db.transaction('rw', db.tables, async () => {
     for (const row of data as RemoteRecord[]) {
+      /*
+       * Advance the cursor *before* deciding whether the row is usable.
+       *
+       * A row for an entity this build does not know about (an older client,
+       * or a newer release that added a type) must still move the cursor
+       * forward. Skipping it without advancing would re-fetch that row on
+       * every single pull, and — because the query is limited to 1000 rows
+       * ordered by `server_at` — a table full of unknown entities would stall
+       * the pull completely, so no known record would ever arrive again.
+       */
+      if (row.server_at) newest = advanceCursor(newest, row.server_at)
+
       if (!SYNCED_ENTITIES.includes(row.entity as SyncedEntity)) continue
 
       const table = db.table(row.entity)
       const local = (await table.get(row.id)) as { updatedAt?: number } | undefined
       const localUpdatedAt = typeof local?.updatedAt === 'number' ? local.updatedAt : -1
-
-      if (row.server_at && (!newest || row.server_at > newest)) newest = row.server_at
 
       if (row.deleted) {
         if (local && localUpdatedAt > row.updated_at) {
@@ -295,7 +365,7 @@ async function pullChanges(
       }
 
       if (local && localUpdatedAt >= row.updated_at) {
-        if (localUpdatedAt > row.updated_at) conflicts += 1
+        if (remoteWins(row.updated_at, localUpdatedAt)) conflicts += 1
         continue
       }
 
@@ -387,14 +457,28 @@ export async function pushEverything(userId: string): Promise<SyncOutcome> {
     for (const entity of SYNCED_ENTITIES) {
       const rows = (await db.table(entity).toArray()) as { id: string; updatedAt?: number }[]
       if (rows.length === 0) continue
-      const payload: RecordInsert[] = rows.map((row) => ({
-        user_id: userId,
+
+      // Same guard as the incremental push: a full re-upload must not
+      // overwrite a newer copy that another device already pushed.
+      const batch: PendingRecord[] = rows.map((row) => ({
         entity,
         id: row.id,
-        entity_label: entityLabel(entity),
-        updated_at: typeof row.updatedAt === 'number' ? row.updatedAt : Date.now(),
+        updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : Date.now(),
         deleted: false,
         payload: row as unknown as Record<string, unknown>,
+      }))
+      const remoteVersions = await readRemoteVersions(client, userId, batch)
+      const { pushable } = partitionPushable(batch, remoteVersions)
+      if (pushable.length === 0) continue
+
+      const payload: RecordInsert[] = pushable.map((record) => ({
+        user_id: userId,
+        entity: record.entity,
+        id: record.id,
+        entity_label: entityLabel(record.entity),
+        updated_at: record.updatedAt,
+        deleted: record.deleted,
+        payload: record.payload,
       }))
       for (let index = 0; index < payload.length; index += 400) {
         const batch = payload.slice(index, index + 400)

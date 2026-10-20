@@ -1,7 +1,8 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
-import type { ComponentProps, ReactNode } from 'react'
+import { useEffect, type ComponentProps, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { dismissTopOverlay, pushBackHandler } from '@/services/native/back-button'
 
 export const Dialog = DialogPrimitive.Root
 export const DialogTrigger = DialogPrimitive.Trigger
@@ -50,6 +51,13 @@ export function DialogContent({
   children,
   ...props
 }: DialogContentProps) {
+  /*
+   * On Android the hardware back button should close the dialog, not navigate
+   * the app behind it. Radix only listens for `Escape`, so the dialog claims
+   * the back press while it is open.
+   */
+  useEffect(() => pushBackHandler(() => dismissTopOverlay()), [])
+
   return (
     <DialogPortal>
       <DialogOverlay />

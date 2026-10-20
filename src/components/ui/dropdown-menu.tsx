@@ -1,7 +1,8 @@
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { Check, ChevronRight } from 'lucide-react'
-import type { ComponentProps } from 'react'
+import { useEffect, type ComponentProps } from 'react'
 import { cn } from '@/lib/utils'
+import { dismissTopOverlay, pushBackHandler } from '@/services/native/back-button'
 
 export const DropdownMenu = DropdownMenuPrimitive.Root
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
@@ -13,6 +14,10 @@ export function DropdownMenuContent({
   sideOffset = 6,
   ...props
 }: ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+  // An open menu should close on the Android hardware back button rather than
+  // letting the press fall through to the app.
+  useEffect(() => pushBackHandler(() => dismissTopOverlay()), [])
+
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content

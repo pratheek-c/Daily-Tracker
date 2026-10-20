@@ -17,6 +17,31 @@ buildscript {
 
 apply from: "variables.gradle"
 
+/*
+ * Keep Gradle's build output outside the project folder.
+ *
+ * A checkout that lives in a cloud-synced folder (OneDrive, Dropbox, Google
+ * Drive) breaks the Android build in ways that look like corrupt resources:
+ * the sync client holds a lock on files the resource merger is writing, and
+ * the build fails with `AccessDeniedException` on its own intermediate
+ * directories. Writing the intermediates to a plain local directory removes the
+ * whole class of problem.
+ *
+ * Override the location with the `ANDROID_BUILD_DIR` environment variable.
+ */
+def externalBuildPath = System.getenv('ANDROID_BUILD_DIR')
+if (!externalBuildPath) {
+    externalBuildPath = new File(
+        System.getProperty('user.home'),
+        '.anusree-tracker-android-build'
+    ).absolutePath
+}
+def externalBuildRoot = new File(externalBuildPath)
+
+allprojects {
+    layout.buildDirectory.set(new File(externalBuildRoot, project.path.replace(':', '/').replaceAll('^/', '')))
+}
+
 allprojects {
     repositories {
         google()

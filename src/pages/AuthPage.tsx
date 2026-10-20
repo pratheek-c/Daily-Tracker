@@ -158,7 +158,7 @@ export function AuthPage() {
   if (cloud.recovering) return <PasswordRecoveryPage />
 
   return (
-    <div className="paper-grain grid min-h-dvh place-items-center px-4 py-10">
+    <div className="paper-grain grid min-h-dvh place-items-center px-4 py-10 pl-[calc(1rem+var(--safe-left))] pr-[calc(1rem+var(--safe-right))] pt-[calc(2.5rem+var(--safe-top))] pb-[calc(2.5rem+var(--safe-bottom))]">
       <div className="w-full max-w-md">
         <header className="mb-5 flex flex-col items-center text-center">
           <Logo className="size-16" />
@@ -546,7 +546,7 @@ export function PasswordRecoveryPage() {
   }
 
   return (
-    <div className="paper-grain grid min-h-dvh place-items-center px-4 py-10">
+    <div className="paper-grain grid min-h-dvh place-items-center px-4 py-10 pl-[calc(1rem+var(--safe-left))] pr-[calc(1rem+var(--safe-right))] pt-[calc(2.5rem+var(--safe-top))] pb-[calc(2.5rem+var(--safe-bottom))]">
       <div className="w-full max-w-md">
         <header className="mb-5 flex flex-col items-center text-center">
           <Logo className="size-16" />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom'
 import { Plus, RefreshCw, X } from 'lucide-react'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -35,6 +35,19 @@ export function AppShell() {
     () => data.notificationLog.filter((entry) => !entry.read).length,
     [data.notificationLog],
   )
+
+  /*
+   * A new page should start at the top. Without this, moving from a long list
+   * to a short page leaves you stranded half-way down the new one, because the
+   * document keeps its previous scroll offset. Back/forward navigation is left
+   * alone, because there the browser restores the previous position and that
+   * is what the user expects.
+   */
+  const navigationType = useNavigationType()
+  useEffect(() => {
+    if (navigationType === 'POP') return
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [location.pathname, navigationType])
 
   if (!ready) {
     return <BootScreen error={error} />
@@ -90,7 +103,7 @@ export function AppShell() {
           />
           <main
             key={location.pathname}
-            className="animate-rise mx-auto w-full max-w-[1500px] px-3 pt-4 pb-28 sm:px-4 lg:px-6 lg:pb-8"
+            className="animate-rise mx-auto w-full max-w-[1500px] px-3 pt-4 pb-[calc(7rem+var(--safe-bottom))] pl-[calc(0.75rem+var(--safe-left))] pr-[calc(0.75rem+var(--safe-right))] sm:px-4 sm:pl-[calc(1rem+var(--safe-left))] sm:pr-[calc(1rem+var(--safe-right))] lg:px-6 lg:pb-8 lg:pl-[calc(1.5rem+var(--safe-left))] lg:pr-[calc(1.5rem+var(--safe-right))]"
           >
             <Outlet />
           </main>
@@ -101,7 +114,7 @@ export function AppShell() {
 
       <Button
         size="icon-lg"
-        className="fixed right-4 bottom-20 z-30 shadow-lg lg:hidden"
+        className="fixed right-[calc(1rem+var(--safe-right))] bottom-[calc(5rem+var(--safe-bottom))] z-30 shadow-lg lg:hidden"
         onClick={() => setMobileNavOpen(true)}
         aria-label="More navigation"
       >
@@ -113,7 +126,7 @@ export function AppShell() {
 
 function BootScreen({ error }: { error: string | null }) {
   return (
-    <div className="paper-grain grid min-h-dvh place-items-center px-6">
+    <div className="paper-grain grid min-h-dvh place-items-center px-6 pt-[calc(1.5rem+var(--safe-top))] pb-[calc(1.5rem+var(--safe-bottom))]">
       <div className="flex max-w-sm flex-col items-center text-center">
         <Logo className="size-16" />
         <Mascot kind="cat-box" className="mt-4 size-32" animate />
@@ -139,7 +152,7 @@ function MobileTabBar({ pending }: { pending: number }) {
   const items = PRIMARY_NAV_ITEMS.slice(0, 5)
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-[var(--surface)]/96 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-[var(--surface)] pb-[var(--safe-bottom)] pl-[var(--safe-left)] pr-[var(--safe-right)] lg:hidden"
       aria-label="Primary"
     >
       <ul className="grid grid-cols-5">

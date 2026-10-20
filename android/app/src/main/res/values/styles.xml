@@ -4,19 +4,29 @@
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
         <!-- Customize your theme here. -->
-        <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
-        <item name="colorAccent">@color/colorAccent</item>
+        <item name="colorPrimary">@color/appAccent</item>
+        <item name="colorPrimaryDark">@color/appAccentDark</item>
+        <item name="colorAccent">@color/appAccent</item>
     </style>
 
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!--
+            Keep the system bars the same colour as the app's surface so the
+            status bar blends into the header rather than showing a grey band.
+            On Android 15+ the app is drawn edge to edge and these are ignored —
+            the CSS inset tokens handle the layout there.
+        -->
+        <item name="android:statusBarColor">@color/appSurface</item>
+        <item name="android:navigationBarColor">@color/appSurface</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>
